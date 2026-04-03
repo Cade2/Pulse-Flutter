@@ -59,8 +59,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final User? currentUser = ref.watch(currentUserProvider);
+    final bool isAuthenticated = ref.watch(isAuthenticatedProvider);
     final String? email = currentUser?.email?.trim();
-    final bool isAuthenticated = currentUser != null;
 
     final String authMessage;
     if (!isAuthenticated) {
@@ -116,6 +116,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ],
                   const SizedBox(height: 32),
+                  FilledButton(
+                    onPressed: isAuthenticated
+                        ? () => context.goNamed(AppRoutes.swipeSessionName)
+                        : null,
+                    child: const Text('Start swipe session'),
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: _isSigningOut || !isAuthenticated
                         ? null

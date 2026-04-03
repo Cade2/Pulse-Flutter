@@ -5,6 +5,9 @@ import 'package:pulse_flutter/features/auth/presentation/login_screen.dart';
 import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
 import 'package:pulse_flutter/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pulse_flutter/features/splash/presentation/splash_screen.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
+import 'package:pulse_flutter/features/swipe_session/presentation/swipe_completion_screen.dart';
+import 'package:pulse_flutter/features/swipe_session/presentation/swipe_screen.dart';
 
 abstract final class AppRoutes {
   static const String splashName = 'splash';
@@ -18,10 +21,21 @@ abstract final class AppRoutes {
 
   static const String homeName = 'home';
   static const String homePath = '/home';
+
+  static const String swipeSessionName = 'swipe-session';
+  static const String swipeSessionPath = '/session';
+
+  static const String swipeSessionCompleteName = 'swipe-session-complete';
+  static const String swipeSessionCompletePath = '/session/complete';
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final bool isAuthenticated = ref.watch(isAuthenticatedProvider);
+  const Set<String> publicPaths = <String>{
+    AppRoutes.splashPath,
+    AppRoutes.onboardingPath,
+    AppRoutes.loginPath,
+  };
 
   final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splashPath,
@@ -46,16 +60,29 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.homeName,
         builder: (context, state) => const HomeScreen(),
       ),
+      GoRoute(
+        path: AppRoutes.swipeSessionPath,
+        name: AppRoutes.swipeSessionName,
+        builder: (context, state) => const SwipeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.swipeSessionCompletePath,
+        name: AppRoutes.swipeSessionCompleteName,
+        builder: (context, state) {
+          final SwipeSessionSummary? summary =
+              state.extra as SwipeSessionSummary?;
+          return SwipeCompletionScreen(summary: summary);
+        },
+      ),
     ],
     redirect: (context, state) {
       final String location = state.matchedLocation;
-      final bool isHomeRoute = location == AppRoutes.homePath;
 
-      if (!isAuthenticated && isHomeRoute) {
+      if (!isAuthenticated && !publicPaths.contains(location)) {
         return AppRoutes.splashPath;
       }
 
-      if (isAuthenticated && !isHomeRoute) {
+      if (isAuthenticated && publicPaths.contains(location)) {
         return AppRoutes.homePath;
       }
 

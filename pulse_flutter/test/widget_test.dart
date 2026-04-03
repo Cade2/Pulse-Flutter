@@ -59,4 +59,40 @@ void main() {
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Splash'), findsNothing);
   });
+
+  testWidgets('signed-in users can complete an eight-card swipe session', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Start swipe session'), findsOneWidget);
+
+    await tester.tap(find.text('Start swipe session'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Card 1 of 8'), findsOneWidget);
+    expect(find.text('Accept'), findsOneWidget);
+    expect(find.text('Reject'), findsOneWidget);
+
+    for (var i = 0; i < 8; i++) {
+      final Finder actionButton = find.text(i.isEven ? 'Accept' : 'Reject');
+      await tester.ensureVisible(actionButton);
+      await tester.tap(actionButton);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('Session complete'), findsOneWidget);
+    expect(find.text('Accepted: 4'), findsOneWidget);
+    expect(find.text('Rejected: 4'), findsOneWidget);
+  });
 }

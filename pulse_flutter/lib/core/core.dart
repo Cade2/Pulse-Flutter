@@ -1,1 +1,2 @@
-// Shared app infrastructure will live here as the Pulse foundation grows.
+export 'firebase/firebase_auth_service.dart';
+export 'providers/auth_providers.dart';

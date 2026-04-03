@@ -19,9 +19,15 @@ final authStateChangesProvider = StreamProvider<User?>((ref) {
 });
 
 final currentUserProvider = Provider<User?>((ref) {
-  return ref
-      .watch(authStateChangesProvider)
-      .maybeWhen(data: (User? user) => user, orElse: () => null);
+  final AsyncValue<User?> authState = ref.watch(authStateChangesProvider);
+  final FirebaseAuthService authService = ref.watch(
+    firebaseAuthServiceProvider,
+  );
+
+  return authState.maybeWhen(
+    data: (User? user) => user,
+    orElse: () => authService.currentUser,
+  );
 });
 
 final isAuthenticatedProvider = Provider<bool>((ref) {

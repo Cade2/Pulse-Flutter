@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
 enum _AuthAction { signIn, createAccount }
 
@@ -46,20 +47,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _errorMessage = null;
     });
 
+    bool didAuthenticate = false;
+
     try {
       final authService = ref.read(firebaseAuthServiceProvider);
+      final userProfileRepository = ref.read(userProfileRepositoryProvider);
+      final UserCredential userCredential;
 
       if (action == _AuthAction.signIn) {
-        await authService.signInWithEmailAndPassword(
+        userCredential = await authService.signInWithEmailAndPassword(
           email: _emailController.text,
           password: _passwordController.text,
         );
       } else {
-        await authService.createUserWithEmailAndPassword(
+        userCredential = await authService.createUserWithEmailAndPassword(
           email: _emailController.text,
           password: _passwordController.text,
         );
       }
+
+      didAuthenticate = true;
+
+      final User? user = userCredential.user;
+      if (user == null) {
+        throw StateError('Authentication completed without a user.');
+      }
+
+      await userProfileRepository.ensureUserProfile(user);
 
       if (!mounted) {
         return;
@@ -75,12 +89,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _errorMessage = _firebaseAuthMessage(error);
       });
     } catch (_) {
+      if (didAuthenticate) {
+        await _rollbackAuthenticatedSession();
+      }
+
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _errorMessage = 'Something went wrong. Please try again.';
+        _errorMessage = didAuthenticate
+            ? 'We couldn\'t finish setting up your profile. Please try again.'
+            : 'Something went wrong. Please try again.';
       });
     } finally {
       if (mounted) {
@@ -89,6 +109,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           _activeAction = null;
         });
       }
+    }
+  }
+
+  Future<void> _rollbackAuthenticatedSession() async {
+    try {
+      await ref.read(firebaseAuthServiceProvider).signOut();
+    } catch (_) {
+      // Best effort only. The UI still surfaces the original error.
     }
   }
 

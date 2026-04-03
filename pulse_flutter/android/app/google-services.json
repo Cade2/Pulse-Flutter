@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "233378636806",
+    "project_id": "pulse-flutter-5e725",
+    "storage_bucket": "pulse-flutter-5e725.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:233378636806:android:dbcd122c9bce5ac236cf87",
+        "android_client_info": {
+          "package_name": "com.example.pulse_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6LTHl6I9HR0LiUmTcOzRmeh552Bdlqvo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -120,15 +120,20 @@ abstract final class PulseBadgeCatalog {
         .where(_isKnownBadgeId)
         .toSet();
 
-    return definitions.map((definition) {
-      final int progress = _progressFor(definition, snapshot);
-      return PulseBadgeStatus(
-        definition: definition,
-        isUnlocked:
-            persistedIds.contains(definition.id) || progress >= definition.target,
-        progress: progress > definition.target ? definition.target : progress,
-      );
-    }).toList(growable: false);
+    return definitions
+        .map((definition) {
+          final int progress = _progressFor(definition, snapshot);
+          return PulseBadgeStatus(
+            definition: definition,
+            isUnlocked:
+                persistedIds.contains(definition.id) ||
+                progress >= definition.target,
+            progress: progress > definition.target
+                ? definition.target
+                : progress,
+          );
+        })
+        .toList(growable: false);
   }
 
   static List<String> sortedBadgeIds(Iterable<String> badgeIds) {
@@ -137,6 +142,16 @@ abstract final class PulseBadgeCatalog {
         .where((definition) => filtered.contains(definition.id))
         .map((definition) => definition.id)
         .toList(growable: false);
+  }
+
+  static PulseBadgeDefinition? definitionForId(String badgeId) {
+    for (final PulseBadgeDefinition definition in definitions) {
+      if (definition.id == badgeId) {
+        return definition;
+      }
+    }
+
+    return null;
   }
 
   static bool _isKnownBadgeId(String badgeId) {

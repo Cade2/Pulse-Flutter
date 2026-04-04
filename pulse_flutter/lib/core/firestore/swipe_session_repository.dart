@@ -4,6 +4,7 @@ import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_reward_details.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
 
@@ -55,6 +56,16 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
       sessionHistory,
       pendingSession,
     );
+    final PulseStreak previousStreak = _resolveStreakFromHistory(
+      sessionHistory,
+    );
+    final PulseLevelProgress previousProgress =
+        _resolveLevelProgressFromHistory(sessionHistory);
+    final List<String> previousUnlockedBadgeIds = _resolveUnlockedBadgeIds(
+      sessionHistory,
+      previousStreak,
+      previousProgress,
+    );
     final PulseStreak nextStreak = _resolveStreakFromHistory(pendingHistory);
     final PulseLevelProgress nextProgress = _resolveLevelProgressFromHistory(
       pendingHistory,
@@ -93,6 +104,16 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
           existingStreak,
           existingProgress,
         );
+        final SwipeSessionRewardDetails reward =
+            SwipeSessionRewardDetails.fromTransition(
+              xpEarned: 0,
+              previousLevelProgress: existingProgress,
+              levelProgress: existingProgress,
+              previousStreak: existingStreak,
+              currentStreak: existingStreak,
+              previousUnlockedBadgeIds: existingUnlockedBadgeIds,
+              unlockedBadgeIds: existingUnlockedBadgeIds,
+            );
 
         transaction.set(userDocument, <String, Object?>{
           ...existingStreak.toFirestore(),
@@ -102,10 +123,20 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
 
         return SwipeSessionSaveResult(
           session: SwipeSessionRecord.fromFirestore(sessionSnapshot),
-          xpEarned: 0,
-          levelProgress: existingProgress,
+          reward: reward,
         );
       }
+
+      final SwipeSessionRewardDetails reward =
+          SwipeSessionRewardDetails.fromTransition(
+            xpEarned: xpEarned,
+            previousLevelProgress: previousProgress,
+            levelProgress: nextProgress,
+            previousStreak: previousStreak,
+            currentStreak: nextStreak,
+            previousUnlockedBadgeIds: previousUnlockedBadgeIds,
+            unlockedBadgeIds: nextUnlockedBadgeIds,
+          );
 
       transaction.set(sessionDocument, record.toFirestore());
       transaction.set(userDocument, <String, Object?>{
@@ -114,11 +145,7 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
         'unlockedBadgeIds': nextUnlockedBadgeIds,
       }, SetOptions(merge: true));
 
-      return SwipeSessionSaveResult(
-        session: record,
-        xpEarned: xpEarned,
-        levelProgress: nextProgress,
-      );
+      return SwipeSessionSaveResult(session: record, reward: reward);
     });
   }
 

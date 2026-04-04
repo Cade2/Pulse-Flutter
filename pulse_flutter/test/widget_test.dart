@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
+import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_insights.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
@@ -14,6 +15,7 @@ import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 import 'package:pulse_flutter/features/swipe_session/models/emotion_card.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_reward_details.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
 
@@ -581,11 +583,13 @@ void main() {
 
     expect(_bottomNavFinder, findsNothing);
     expect(find.text('Session complete'), findsOneWidget);
-    expect(find.text('Cards reviewed: 8'), findsOneWidget);
-    expect(find.text('Accepted: 4'), findsOneWidget);
-    expect(find.text('Rejected: 4'), findsOneWidget);
-    expect(find.text('XP earned: +65 XP'), findsOneWidget);
-    expect(find.text('65 XP total'), findsOneWidget);
+    expect(find.text('Session reward'), findsOneWidget);
+    expect(find.text('+65 XP'), findsOneWidget);
+    expect(find.text('65 XP'), findsOneWidget);
+    expect(find.text('Level 1'), findsOneWidget);
+    expect(find.text('Session summary'), findsOneWidget);
+    expect(find.text('8'), findsWidgets);
+    expect(find.text('4'), findsWidgets);
     expect(find.textContaining('saved to your history'), findsOneWidget);
     expect(find.textContaining('Social: Friends'), findsOneWidget);
     expect(fakeRepository.lastUid, 'test-user');
@@ -594,6 +598,120 @@ void main() {
     expect(fakeRepository.lastSavedSession!.contextSleep, 'Good');
     expect(fakeRepository.lastSaveResult?.xpEarned, 65);
   });
+
+  testWidgets(
+    'completion surfaces level-up, new badges, and streak milestone',
+    (WidgetTester tester) async {
+      final _FakeSwipeSessionRepository fakeRepository =
+          _FakeSwipeSessionRepository(
+            sessions: [
+              _buildSessionRecord(
+                date: '2026-03-25',
+                acceptedEmotions: const ['Calm'],
+              ),
+              _buildSessionRecord(
+                date: '2026-03-27',
+                acceptedEmotions: const ['Joy'],
+                contextSocial: 'Solo',
+                contextEnergy: 'High',
+                contextSleep: 'Good',
+              ),
+              _buildSessionRecord(
+                date: '2026-03-29',
+                acceptedEmotions: const ['Focus'],
+              ),
+              _buildSessionRecord(
+                date: '2026-03-31',
+                acceptedEmotions: const ['Hope'],
+              ),
+              _buildSessionRecord(
+                date: '2026-04-02',
+                acceptedEmotions: const ['Calm'],
+                contextSocial: 'Friends',
+                contextEnergy: 'Steady',
+                contextSleep: 'Good',
+              ),
+              _buildSessionRecord(
+                date: '2026-04-03',
+                acceptedEmotions: const ['Calm'],
+                contextSocial: 'Friends',
+                contextEnergy: 'Steady',
+              ),
+            ],
+          );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => 'test-user'),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            currentUserProfileProvider.overrideWith(
+              (ref) => Stream.value(
+                _buildProfile(
+                  displayName: 'Maya',
+                  email: 'maya@example.com',
+                  avatarColour: '#10B981',
+                ),
+              ),
+            ),
+            currentUserStreakProvider.overrideWith(
+              (ref) => const PulseStreak(
+                currentStreak: 2,
+                longestStreak: 2,
+                lastSessionDate: '2026-04-03',
+              ),
+            ),
+            currentUserLevelProgressProvider.overrideWith(
+              (ref) => const PulseLevelProgress(totalXp: 340, currentLevel: 4),
+            ),
+            swipeSessionRepositoryProvider.overrideWith(
+              (ref) => fakeRepository,
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Start swipe session'));
+      await tester.tap(find.text('Start swipe session'));
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 8; i++) {
+        final Finder actionButton = find.text(i.isEven ? 'Accept' : 'Reject');
+        await tester.ensureVisible(actionButton);
+        await tester.tap(actionButton);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.tap(find.text('Friends'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Steady'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save session'));
+      await tester.tap(find.text('Save session'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Level up'), findsOneWidget);
+      expect(find.text('You reached Level 5.'), findsOneWidget);
+      expect(find.text('New badges'), findsOneWidget);
+      expect(find.text('On A Roll'), findsOneWidget);
+      expect(find.text('Seven Check-Ins'), findsOneWidget);
+      expect(find.text('Streak milestone'), findsOneWidget);
+      expect(
+        find.text('Streak milestone reached: 3 days in a row.'),
+        findsOneWidget,
+      );
+      expect(find.text('Current streak: 3 days'), findsOneWidget);
+      expect(fakeRepository.lastSaveResult?.reward.didLevelUp, isTrue);
+      expect(
+        fakeRepository.lastSaveResult?.reward.newlyUnlockedBadgeIds,
+        <String>['on-a-roll', 'seven-check-ins'],
+      );
+    },
+  );
 
   testWidgets('history shows saved sessions in reverse chronological order', (
     WidgetTester tester,
@@ -902,7 +1020,6 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
   String? lastUid;
   SwipeSessionRecord? lastSavedSession;
   SwipeSessionSaveResult? lastSaveResult;
-  PulseLevelProgress _currentLevelProgress = const PulseLevelProgress();
 
   @override
   Future<SwipeSessionSaveResult> saveSession({
@@ -913,6 +1030,8 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
     String? contextSleep,
   }) async {
     lastUid = uid;
+    final List<SwipeSessionRecord> previousSessions =
+        List<SwipeSessionRecord>.from(_sessions);
     lastSavedSession = SwipeSessionRecord.fromSummary(
       summary: summary,
       contextSocial: contextSocial,
@@ -920,20 +1039,47 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
       contextSleep: contextSleep,
       completedAt: DateTime(2026, 4, 4, 12),
     );
+    final PulseLevelProgress previousLevelProgress = _levelProgressFromSessions(
+      previousSessions,
+    );
+    final PulseStreak previousStreak = _streakFromSessions(
+      previousSessions,
+      currentDate: lastSavedSession!.completedAt,
+    );
+    final List<String> previousUnlockedBadgeIds = _unlockedBadgeIdsFromSessions(
+      previousSessions,
+      previousStreak,
+      previousLevelProgress,
+    );
     _sessions.removeWhere(
       (session) => session.sessionId == lastSavedSession!.sessionId,
     );
     _sessions.add(lastSavedSession!);
-    final int xpEarned = PulseLevelProgress.sessionXp(
-      contextSocial: contextSocial,
-      contextEnergy: contextEnergy,
-      contextSleep: contextSleep,
+    final PulseLevelProgress levelProgress = _levelProgressFromSessions(
+      _sessions,
     );
-    _currentLevelProgress = _currentLevelProgress.addXp(xpEarned);
+    final PulseStreak currentStreak = _streakFromSessions(
+      _sessions,
+      currentDate: lastSavedSession!.completedAt,
+    );
+    final List<String> unlockedBadgeIds = _unlockedBadgeIdsFromSessions(
+      _sessions,
+      currentStreak,
+      levelProgress,
+    );
+    final SwipeSessionRewardDetails reward =
+        SwipeSessionRewardDetails.fromTransition(
+          xpEarned: _sessionXpForRecord(lastSavedSession!),
+          previousLevelProgress: previousLevelProgress,
+          levelProgress: levelProgress,
+          previousStreak: previousStreak,
+          currentStreak: currentStreak,
+          previousUnlockedBadgeIds: previousUnlockedBadgeIds,
+          unlockedBadgeIds: unlockedBadgeIds,
+        );
     lastSaveResult = SwipeSessionSaveResult(
       session: lastSavedSession!,
-      xpEarned: xpEarned,
-      levelProgress: _currentLevelProgress,
+      reward: reward,
     );
     return lastSaveResult!;
   }
@@ -962,6 +1108,50 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
     )..sort((a, b) => b.completedAt.compareTo(a.completedAt));
 
     return Stream<List<SwipeSessionRecord>>.value(sorted);
+  }
+
+  PulseLevelProgress _levelProgressFromSessions(
+    List<SwipeSessionRecord> sessions,
+  ) {
+    return PulseLevelProgress.fromSessionXpAwards(
+      sessions.map(_sessionXpForRecord),
+    );
+  }
+
+  PulseStreak _streakFromSessions(
+    List<SwipeSessionRecord> sessions, {
+    required DateTime currentDate,
+  }) {
+    if (sessions.isEmpty) {
+      return const PulseStreak();
+    }
+
+    return PulseStreak.fromSessionDates(
+      sessions.map((session) => session.sessionId),
+      currentDate: currentDate,
+    );
+  }
+
+  List<String> _unlockedBadgeIdsFromSessions(
+    List<SwipeSessionRecord> sessions,
+    PulseStreak streak,
+    PulseLevelProgress levelProgress,
+  ) {
+    return PulseBadgeCatalog.unlockedBadgeIds(
+      PulseBadgeProgressSnapshot(
+        sessionCount: sessions.length,
+        longestStreak: streak.longestStreak,
+        currentLevel: levelProgress.currentLevel,
+      ),
+    );
+  }
+
+  int _sessionXpForRecord(SwipeSessionRecord session) {
+    return PulseLevelProgress.sessionXp(
+      contextSocial: session.contextSocial,
+      contextEnergy: session.contextEnergy,
+      contextSleep: session.contextSleep,
+    );
   }
 }
 

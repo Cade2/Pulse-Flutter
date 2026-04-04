@@ -773,6 +773,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_selectedBottomNavIndex(tester), 1);
+    expect(find.text('April 2026'), findsOneWidget);
+    expect(find.text('Session journey'), findsOneWidget);
     expect(find.text('2026-04-04'), findsOneWidget);
     expect(find.text('2026-04-02'), findsOneWidget);
     expect(find.text('Accepted 3 of 8 emotions'), findsOneWidget);
@@ -781,6 +783,82 @@ void main() {
     final Finder latest = find.text('2026-04-04');
     final Finder older = find.text('2026-04-02');
     expect(tester.getTopLeft(latest).dy, lessThan(tester.getTopLeft(older).dy));
+  });
+
+  testWidgets('history supports month navigation across saved periods', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-03-15',
+              acceptedEmotions: const ['Hope', 'Calm'],
+            ),
+            _buildSessionRecord(
+              date: '2026-04-04',
+              acceptedEmotions: const ['Focus', 'Confidence'],
+              contextSocial: 'Friends',
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 3,
+              longestStreak: 5,
+              lastSessionDate: '2026-04-04',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 180, currentLevel: 2),
+          ),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 4),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('History'));
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('April 2026'), findsOneWidget);
+    expect(find.text('2026-04-04'), findsOneWidget);
+    expect(find.text('2026-03-15'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('history-previous-month')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('March 2026'), findsOneWidget);
+    expect(find.text('2026-03-15'), findsOneWidget);
+    expect(find.text('2026-04-04'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('history-next-month')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('April 2026'), findsOneWidget);
+    expect(find.text('2026-04-04'), findsOneWidget);
   });
 
   testWidgets('history item opens a session detail view', (
@@ -837,7 +915,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_selectedBottomNavIndex(tester), 1);
-    await tester.tap(find.text('2026-04-04'));
+    await tester.tap(find.byKey(const Key('history-day-2026-04-04')));
     await tester.pumpAndSettle();
 
     expect(find.text('Session details'), findsOneWidget);

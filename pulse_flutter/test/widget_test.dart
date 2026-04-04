@@ -43,6 +43,7 @@ void main() {
 
     expect(find.text('Login'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(2));
+    expect(_bottomNavFinder, findsNothing);
 
     final BuildContext context = tester.element(find.text('Login'));
     GoRouter.of(context).go(AppRoutes.homePath);
@@ -80,7 +81,8 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Home'), findsOneWidget);
+    expect(_bottomNavFinder, findsOneWidget);
+    expect(_selectedBottomNavIndex(tester), 0);
     expect(find.text('Splash'), findsNothing);
     expect(find.text('Welcome back, Maya'), findsOneWidget);
     expect(find.text('maya@example.com'), findsOneWidget);
@@ -124,6 +126,7 @@ void main() {
     await tester.tap(find.text('Profile').last);
     await tester.pumpAndSettle();
 
+    expect(_selectedBottomNavIndex(tester), 4);
     expect(find.text('Profile'), findsWidgets);
     expect(find.text('ava@example.com'), findsOneWidget);
     expect(find.text('Save profile'), findsOneWidget);
@@ -184,7 +187,8 @@ void main() {
     await tester.tap(find.text('View badges'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Badges'), findsOneWidget);
+    expect(_selectedBottomNavIndex(tester), 3);
+    expect(find.text('Badges'), findsWidgets);
     expect(find.text('Unlocked badges'), findsOneWidget);
     expect(find.text('Locked badges'), findsOneWidget);
     expect(find.text('First Pulse'), findsOneWidget);
@@ -248,6 +252,7 @@ void main() {
     await tester.tap(find.text('Insights').last);
     await tester.pumpAndSettle();
 
+    expect(_selectedBottomNavIndex(tester), 2);
     expect(find.text('Insights are locked'), findsOneWidget);
     expect(find.text('3 / 5 sessions'), findsOneWidget);
     expect(
@@ -317,6 +322,7 @@ void main() {
     await tester.tap(find.text('Insights').last);
     await tester.pumpAndSettle();
 
+    expect(_selectedBottomNavIndex(tester), 2);
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('Top accepted emotions'), findsOneWidget);
     expect(find.text('Most common context tags'), findsOneWidget);
@@ -388,6 +394,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    expect(_selectedBottomNavIndex(tester), 0);
     expect(find.text('Done for today'), findsOneWidget);
     expect(find.text('Today\'s session is complete'), findsOneWidget);
     expect(find.text('Level 2'), findsOneWidget);
@@ -447,11 +454,11 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    final BuildContext context = tester.element(find.text('Home'));
+    final BuildContext context = tester.element(find.text('Done for today'));
     GoRouter.of(context).go(AppRoutes.swipeSessionPath);
     await tester.pumpAndSettle();
 
-    expect(find.text('Home'), findsOneWidget);
+    expect(_selectedBottomNavIndex(tester), 0);
     expect(find.text('Done for today'), findsOneWidget);
     expect(find.text('Card 1 of 8'), findsNothing);
   });
@@ -488,6 +495,7 @@ void main() {
     await tester.tap(find.text('Start swipe session'));
     await tester.pumpAndSettle();
 
+    expect(_bottomNavFinder, findsNothing);
     final Finder swipeCard = find.byKey(const Key('swipe-session-card'));
     await tester.ensureVisible(swipeCard);
 
@@ -543,6 +551,7 @@ void main() {
     await tester.tap(find.text('Start swipe session'));
     await tester.pumpAndSettle();
 
+    expect(_bottomNavFinder, findsNothing);
     expect(find.text('Card 1 of 8'), findsOneWidget);
     expect(find.text('Accept'), findsOneWidget);
     expect(find.text('Reject'), findsOneWidget);
@@ -570,6 +579,7 @@ void main() {
     await tester.tap(find.text('Save session'));
     await tester.pumpAndSettle();
 
+    expect(_bottomNavFinder, findsNothing);
     expect(find.text('Session complete'), findsOneWidget);
     expect(find.text('Cards reviewed: 8'), findsOneWidget);
     expect(find.text('Accepted: 4'), findsOneWidget);
@@ -638,11 +648,11 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('View history'));
-    await tester.tap(find.text('View history'));
+    await tester.ensureVisible(find.text('History'));
+    await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
 
-    expect(find.text('History'), findsOneWidget);
+    expect(_selectedBottomNavIndex(tester), 1);
     expect(find.text('2026-04-04'), findsOneWidget);
     expect(find.text('2026-04-02'), findsOneWidget);
     expect(find.text('Accepted 3 of 8 emotions'), findsOneWidget);
@@ -702,10 +712,11 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('View history'));
-    await tester.tap(find.text('View history'));
+    await tester.ensureVisible(find.text('History'));
+    await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
 
+    expect(_selectedBottomNavIndex(tester), 1);
     await tester.tap(find.text('2026-04-04'));
     await tester.pumpAndSettle();
 
@@ -754,15 +765,81 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('View history'));
-    await tester.tap(find.text('View history'));
+    await tester.ensureVisible(find.text('History'));
+    await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
 
+    expect(_selectedBottomNavIndex(tester), 1);
     expect(find.text('No sessions yet'), findsOneWidget);
     expect(
       find.textContaining('Complete your first swipe session'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('bottom navigation stays in sync across main screens', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-04',
+              acceptedEmotions: const ['Calm', 'Joy'],
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 2,
+              longestStreak: 3,
+              lastSessionDate: '2026-04-04',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 90, currentLevel: 1),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(_selectedBottomNavIndex(tester), 0);
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+    expect(_selectedBottomNavIndex(tester), 1);
+
+    await tester.tap(find.text('Insights'));
+    await tester.pumpAndSettle();
+    expect(_selectedBottomNavIndex(tester), 2);
+
+    await tester.tap(find.text('Badges'));
+    await tester.pumpAndSettle();
+    expect(_selectedBottomNavIndex(tester), 3);
+
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    expect(_selectedBottomNavIndex(tester), 4);
   });
 }
 
@@ -891,4 +968,10 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
 String _formatInsightAverage(double value) {
   final bool isWholeNumber = value == value.roundToDouble();
   return isWholeNumber ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+}
+
+final Finder _bottomNavFinder = find.byKey(const Key('pulse-bottom-nav'));
+
+int _selectedBottomNavIndex(WidgetTester tester) {
+  return tester.widget<NavigationBar>(_bottomNavFinder).selectedIndex;
 }

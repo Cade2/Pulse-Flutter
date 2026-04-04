@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pulse_flutter/app/app_shell.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/features/auth/presentation/login_screen.dart';
@@ -78,30 +79,37 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.loginName,
         builder: (context, state) => const LoginScreen(),
       ),
-      GoRoute(
-        path: AppRoutes.homePath,
-        name: AppRoutes.homeName,
-        builder: (context, state) => const HomeScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.historyPath,
-        name: AppRoutes.historyName,
-        builder: (context, state) => const HistoryScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.profilePath,
-        name: AppRoutes.profileName,
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.badgesPath,
-        name: AppRoutes.badgesName,
-        builder: (context, state) => const BadgesScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.insightsPath,
-        name: AppRoutes.insightsName,
-        builder: (context, state) => const InsightsScreen(),
+      ShellRoute(
+        builder: (context, state, child) {
+          return AppShell(currentLocation: state.matchedLocation, child: child);
+        },
+        routes: <RouteBase>[
+          GoRoute(
+            path: AppRoutes.homePath,
+            name: AppRoutes.homeName,
+            builder: (context, state) => const HomeScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.historyPath,
+            name: AppRoutes.historyName,
+            builder: (context, state) => const HistoryScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.insightsPath,
+            name: AppRoutes.insightsName,
+            builder: (context, state) => const InsightsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.badgesPath,
+            name: AppRoutes.badgesName,
+            builder: (context, state) => const BadgesScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.profilePath,
+            name: AppRoutes.profileName,
+            builder: (context, state) => const ProfileScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutes.swipeSessionPath,

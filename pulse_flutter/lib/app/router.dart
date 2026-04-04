@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app_shell.dart';
@@ -52,17 +53,71 @@ abstract final class AppRoutes {
   static const String swipeSessionCompletePath = '/session/complete';
 }
 
-final appRouterProvider = Provider<GoRouter>((ref) {
-  final bool isAuthenticated = ref.watch(isAuthenticatedProvider);
-  final bool hasCompletedToday = ref.watch(hasCompletedTodayProvider);
-  const Set<String> publicPaths = <String>{
+class _AppRouterNotifier extends ChangeNotifier {
+  _AppRouterNotifier(this._ref)
+    : _isAuthenticated = _ref.read(isAuthenticatedProvider),
+      _hasCompletedToday = _ref.read(hasCompletedTodayProvider) {
+    _ref.listen<bool>(isAuthenticatedProvider, (previous, next) {
+      if (_isAuthenticated == next) {
+        return;
+      }
+
+      _isAuthenticated = next;
+      notifyListeners();
+    });
+
+    _ref.listen<bool>(hasCompletedTodayProvider, (previous, next) {
+      if (_hasCompletedToday == next) {
+        return;
+      }
+
+      _hasCompletedToday = next;
+      notifyListeners();
+    });
+  }
+
+  final Ref _ref;
+  bool _isAuthenticated;
+  bool _hasCompletedToday;
+
+  static const Set<String> publicPaths = <String>{
     AppRoutes.splashPath,
     AppRoutes.onboardingPath,
     AppRoutes.loginPath,
   };
 
+  String? redirect(GoRouterState state) {
+    final String location = state.matchedLocation;
+
+    if (!_isAuthenticated && !publicPaths.contains(location)) {
+      return AppRoutes.splashPath;
+    }
+
+    if (_isAuthenticated && publicPaths.contains(location)) {
+      return AppRoutes.homePath;
+    }
+
+    if (_isAuthenticated &&
+        _hasCompletedToday &&
+        location == AppRoutes.swipeSessionPath) {
+      return AppRoutes.homePath;
+    }
+
+    return null;
+  }
+}
+
+final _appRouterNotifierProvider = Provider<_AppRouterNotifier>((ref) {
+  final _AppRouterNotifier notifier = _AppRouterNotifier(ref);
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final _AppRouterNotifier notifier = ref.watch(_appRouterNotifierProvider);
   final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splashPath,
+    refreshListenable: notifier,
     routes: <RouteBase>[
       GoRoute(
         path: AppRoutes.splashPath,
@@ -135,25 +190,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
     ],
-    redirect: (context, state) {
-      final String location = state.matchedLocation;
-
-      if (!isAuthenticated && !publicPaths.contains(location)) {
-        return AppRoutes.splashPath;
-      }
-
-      if (isAuthenticated && publicPaths.contains(location)) {
-        return AppRoutes.homePath;
-      }
-
-      if (isAuthenticated &&
-          hasCompletedToday &&
-          location == AppRoutes.swipeSessionPath) {
-        return AppRoutes.homePath;
-      }
-
-      return null;
-    },
+    redirect: (context, state) => notifier.redirect(state),
   );
 
   ref.onDispose(router.dispose);

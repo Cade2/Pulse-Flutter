@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1017,6 +1019,8 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
   }) : _sessions = List<SwipeSessionRecord>.from(sessions);
 
   final List<SwipeSessionRecord> _sessions;
+  final StreamController<void> _changesController =
+      StreamController<void>.broadcast();
   String? lastUid;
   SwipeSessionRecord? lastSavedSession;
   SwipeSessionSaveResult? lastSaveResult;
@@ -1081,6 +1085,7 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
       session: lastSavedSession!,
       reward: reward,
     );
+    _changesController.add(null);
     return lastSaveResult!;
   }
 
@@ -1088,26 +1093,15 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
   Stream<SwipeSessionRecord?> watchSession({
     required String uid,
     required String sessionId,
-  }) {
-    SwipeSessionRecord? matchingSession;
-
-    for (final SwipeSessionRecord session in _sessions) {
-      if (session.sessionId == sessionId) {
-        matchingSession = session;
-        break;
-      }
-    }
-
-    return Stream<SwipeSessionRecord?>.value(matchingSession);
+  }) async* {
+    yield _matchingSession(sessionId);
+    yield* _changesController.stream.map((_) => _matchingSession(sessionId));
   }
 
   @override
-  Stream<List<SwipeSessionRecord>> watchSessions({required String uid}) {
-    final List<SwipeSessionRecord> sorted = List<SwipeSessionRecord>.from(
-      _sessions,
-    )..sort((a, b) => b.completedAt.compareTo(a.completedAt));
-
-    return Stream<List<SwipeSessionRecord>>.value(sorted);
+  Stream<List<SwipeSessionRecord>> watchSessions({required String uid}) async* {
+    yield _sortedSessions();
+    yield* _changesController.stream.map((_) => _sortedSessions());
   }
 
   PulseLevelProgress _levelProgressFromSessions(
@@ -1152,6 +1146,21 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
       contextEnergy: session.contextEnergy,
       contextSleep: session.contextSleep,
     );
+  }
+
+  SwipeSessionRecord? _matchingSession(String sessionId) {
+    for (final SwipeSessionRecord session in _sessions) {
+      if (session.sessionId == sessionId) {
+        return session;
+      }
+    }
+
+    return null;
+  }
+
+  List<SwipeSessionRecord> _sortedSessions() {
+    return List<SwipeSessionRecord>.from(_sessions)
+      ..sort((a, b) => b.completedAt.compareTo(a.completedAt));
   }
 }
 

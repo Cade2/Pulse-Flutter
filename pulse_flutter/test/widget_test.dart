@@ -177,6 +177,54 @@ void main() {
     expect(tester.getTopLeft(latest).dy, lessThan(tester.getTopLeft(older).dy));
   });
 
+  testWidgets('history item opens a session detail view', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-04',
+              acceptedEmotions: const ['Focus', 'Hope', 'Confidence'],
+              contextSocial: 'Friends',
+              contextEnergy: 'High',
+              contextSleep: 'Good',
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('View history'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('2026-04-04'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Session details'), findsOneWidget);
+    expect(find.text('Accepted'), findsOneWidget);
+    expect(find.text('Rejected'), findsOneWidget);
+    expect(find.text('Accepted emotions'), findsOneWidget);
+    expect(find.text('Focus'), findsOneWidget);
+    expect(find.text('Hope'), findsOneWidget);
+    expect(find.text('Confidence'), findsOneWidget);
+    expect(find.text('Social: Friends'), findsOneWidget);
+    expect(find.text('Energy: High'), findsOneWidget);
+    expect(find.text('Sleep: Good'), findsOneWidget);
+  });
+
   testWidgets('history shows an empty state when no sessions exist', (
     WidgetTester tester,
   ) async {

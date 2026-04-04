@@ -6,6 +6,7 @@ import 'package:pulse_flutter/features/auth/presentation/login_screen.dart';
 import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
 import 'package:pulse_flutter/features/history/presentation/history_screen.dart';
 import 'package:pulse_flutter/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:pulse_flutter/features/profile/presentation/profile_screen.dart';
 import 'package:pulse_flutter/features/splash/presentation/splash_screen.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
@@ -28,6 +29,9 @@ abstract final class AppRoutes {
 
   static const String historyName = 'history';
   static const String historyPath = '/history';
+
+  static const String profileName = 'profile';
+  static const String profilePath = '/profile';
 
   static const String swipeSessionName = 'swipe-session';
   static const String swipeSessionPath = '/session';
@@ -75,6 +79,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.historyPath,
         name: AppRoutes.historyName,
         builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profilePath,
+        name: AppRoutes.profileName,
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: AppRoutes.swipeSessionPath,

@@ -75,6 +75,17 @@ class UserProfileRepository {
     });
   }
 
+  Future<void> updateProfile({
+    required String uid,
+    String? displayName,
+    required String avatarColour,
+  }) async {
+    await userDocument(uid).set(<String, Object?>{
+      'displayName': _trimToNull(displayName),
+      'avatarColour': PulseUserProfile.normalizeAvatarColour(avatarColour),
+    }, SetOptions(merge: true));
+  }
+
   Future<PulseUserProfile> _buildReconciledProfile({
     required String uid,
     required DocumentSnapshot<Map<String, dynamic>> snapshot,
@@ -97,11 +108,15 @@ class UserProfileRepository {
     final bool levelNeedsWriteback =
         profile.totalXp != reconciledLevelProgress.totalXp ||
         profile.currentLevel != reconciledLevelProgress.currentLevel;
+    final bool avatarNeedsWriteback = PulseUserProfile.needsAvatarColourRepair(
+      data['avatarColour'],
+    );
 
-    if (streakNeedsWriteback || levelNeedsWriteback) {
+    if (streakNeedsWriteback || levelNeedsWriteback || avatarNeedsWriteback) {
       await userDocument(uid).set(<String, Object?>{
         if (streakNeedsWriteback) ...reconciledStreak.toFirestore(),
         if (levelNeedsWriteback) ...reconciledLevelProgress.toFirestore(),
+        if (avatarNeedsWriteback) 'avatarColour': profile.avatarColour,
       }, SetOptions(merge: true));
     }
 
@@ -158,7 +173,7 @@ class UserProfileRepository {
   }
 
   String _resolveAvatarColour(Object? existingValue) {
-    return _trimToNull(existingValue) ?? PulseUserProfile.defaultAvatarColour;
+    return PulseUserProfile.normalizeAvatarColour(existingValue);
   }
 
   String? _trimToNull(Object? value) {

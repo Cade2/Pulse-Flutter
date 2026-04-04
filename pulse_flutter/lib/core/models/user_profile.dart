@@ -1,10 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 
 class PulseUserProfile {
   static const String defaultAvatarColour = '#2ED3E6';
+  static const List<String> avatarColourOptions = <String>[
+    '#2ED3E6',
+    '#10B981',
+    '#F59E0B',
+    '#F97316',
+    '#EC4899',
+    '#6366F1',
+  ];
+  static final RegExp _avatarColourPattern = RegExp(r'^#[0-9A-F]{6}$');
 
   const PulseUserProfile({
     required this.uid,
@@ -42,6 +52,32 @@ class PulseUserProfile {
 
   PulseLevelProgress get levelProgress {
     return PulseLevelProgress.fromTotalXp(totalXp);
+  }
+
+  String get greetingName {
+    final String? explicitName = _readNullableString(displayName);
+    if (explicitName != null) {
+      return explicitName;
+    }
+
+    final String? emailName = friendlyNameFromEmail(email);
+    if (emailName != null) {
+      return emailName;
+    }
+
+    return 'there';
+  }
+
+  String get avatarInitial {
+    final String primaryLabel =
+        _readNullableString(displayName) ??
+        friendlyNameFromEmail(email) ??
+        'Pulse';
+    return primaryLabel.substring(0, 1).toUpperCase();
+  }
+
+  Color get avatarColor {
+    return colorFromHex(avatarColour);
   }
 
   PulseUserProfile withStreak(PulseStreak streak) {
@@ -94,8 +130,7 @@ class PulseUserProfile {
       uid: _readNullableString(data['uid']) ?? snapshot.id,
       email: _readNullableString(data['email']) ?? '',
       displayName: _readNullableString(data['displayName']),
-      avatarColour:
-          _readNullableString(data['avatarColour']) ?? defaultAvatarColour,
+      avatarColour: normalizeAvatarColour(data['avatarColour']),
       currentStreak: streak.currentStreak,
       longestStreak: streak.longestStreak,
       lastSessionDate: streak.lastSessionDate,
@@ -111,7 +146,7 @@ class PulseUserProfile {
       'uid': uid,
       'email': email,
       'displayName': displayName,
-      'avatarColour': avatarColour,
+      'avatarColour': normalizeAvatarColour(avatarColour),
       'currentStreak': currentStreak,
       'longestStreak': longestStreak,
       'lastSessionDate': lastSessionDate,
@@ -120,6 +155,42 @@ class PulseUserProfile {
       if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
       if (lastSeenAt != null) 'lastSeenAt': Timestamp.fromDate(lastSeenAt!),
     };
+  }
+
+  static String normalizeAvatarColour(Object? value) {
+    final String? candidate = _readNullableString(value)?.toUpperCase();
+    if (candidate == null || !_avatarColourPattern.hasMatch(candidate)) {
+      return defaultAvatarColour;
+    }
+
+    return candidate;
+  }
+
+  static bool needsAvatarColourRepair(Object? value) {
+    final String normalized = normalizeAvatarColour(value);
+    final String? stored = _readNullableString(value)?.toUpperCase();
+    return stored != normalized;
+  }
+
+  static Color colorFromHex(String value) {
+    final String normalized = normalizeAvatarColour(value);
+    final int rgb = int.parse(normalized.substring(1), radix: 16);
+    return Color(0xFF000000 | rgb);
+  }
+
+  static String? friendlyNameFromEmail(String? value) {
+    final String? email = _readNullableString(value);
+    if (email == null) {
+      return null;
+    }
+
+    final String localPart = email.split('@').first.trim();
+    if (localPart.isEmpty) {
+      return null;
+    }
+
+    final String spaced = localPart.replaceAll(RegExp(r'[._-]+'), ' ');
+    return spaced.substring(0, 1).toUpperCase() + spaced.substring(1);
   }
 
   static String? _readNullableString(Object? value) {

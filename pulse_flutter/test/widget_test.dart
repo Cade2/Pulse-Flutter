@@ -7,6 +7,7 @@ import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
+import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -58,6 +59,15 @@ void main() {
         overrides: [
           currentUserProvider.overrideWith((ref) => null),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
           currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
           currentUserLevelProgressProvider.overrideWith(
             (ref) => const PulseLevelProgress(),
@@ -71,11 +81,52 @@ void main() {
 
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Splash'), findsNothing);
+    expect(find.text('Welcome back, Maya'), findsOneWidget);
+    expect(find.text('maya@example.com'), findsOneWidget);
     expect(find.text('Pulse progress'), findsOneWidget);
     expect(find.text('Current streak'), findsOneWidget);
     expect(find.text('Level 1'), findsOneWidget);
     expect(find.text('0 XP total'), findsOneWidget);
     expect(find.text('0 days'), findsOneWidget);
+  });
+
+  testWidgets('profile screen is reachable from home', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Profile'));
+    await tester.tap(find.text('Profile').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profile'), findsWidgets);
+    expect(find.text('ava@example.com'), findsOneWidget);
+    expect(find.text('Save profile'), findsOneWidget);
+    expect(find.text('Ava'), findsWidgets);
   });
 
   testWidgets('home shows done-for-today state when today already exists', (
@@ -98,6 +149,15 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Caleb',
+                email: 'caleb@example.com',
+                avatarColour: '#2ED3E6',
+              ),
+            ),
+          ),
           currentUserStreakProvider.overrideWith(
             (ref) => const PulseStreak(
               currentStreak: 4,
@@ -148,6 +208,15 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Caleb',
+                email: 'caleb@example.com',
+                avatarColour: '#2ED3E6',
+              ),
+            ),
+          ),
           currentUserStreakProvider.overrideWith(
             (ref) => const PulseStreak(
               currentStreak: 2,
@@ -186,6 +255,15 @@ void main() {
         overrides: [
           currentUserProvider.overrideWith((ref) => null),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
           currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
           currentUserLevelProgressProvider.overrideWith(
             (ref) => const PulseLevelProgress(),
@@ -229,6 +307,15 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
           currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
           currentUserLevelProgressProvider.overrideWith(
             (ref) => const PulseLevelProgress(),
@@ -315,6 +402,15 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
           currentUserStreakProvider.overrideWith(
             (ref) => const PulseStreak(
               currentStreak: 3,
@@ -370,6 +466,15 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
           currentUserStreakProvider.overrideWith(
             (ref) => const PulseStreak(
               currentStreak: 3,
@@ -419,6 +524,15 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
           currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
           currentUserLevelProgressProvider.overrideWith(
             (ref) => const PulseLevelProgress(),
@@ -441,6 +555,19 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+PulseUserProfile _buildProfile({
+  required String email,
+  String? displayName,
+  String avatarColour = PulseUserProfile.defaultAvatarColour,
+}) {
+  return PulseUserProfile(
+    uid: 'test-user',
+    email: email,
+    displayName: displayName,
+    avatarColour: avatarColour,
+  );
 }
 
 SwipeSessionRecord _buildSessionRecord({

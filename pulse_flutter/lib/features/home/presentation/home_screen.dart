@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
+import 'package:pulse_flutter/components/pulse_avatar.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
+import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -64,6 +66,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final User? currentUser = ref.watch(currentUserProvider);
     final bool isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final AsyncValue<PulseUserProfile?> profileAsync = ref.watch(
+      currentUserProfileProvider,
+    );
+    final PulseUserProfile? profile = profileAsync.asData?.value;
     final PulseLevelProgress levelProgress = ref.watch(
       currentUserLevelProgressProvider,
     );
@@ -74,7 +80,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       todaySwipeSessionProvider,
     );
     final SwipeSessionRecord? todaySession = todaySessionAsync.asData?.value;
-    final String? email = currentUser?.email?.trim();
+    final String? email = currentUser?.email?.trim().isNotEmpty == true
+        ? currentUser!.email!.trim()
+        : profile?.email.trim();
     final bool isCheckingToday =
         isAuthenticated &&
         todaySessionAsync.isLoading &&
@@ -89,12 +97,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         !isCheckingToday &&
         !hasTodaySession &&
         !hasTodaySessionError;
+    final String greetingName =
+        profile?.greetingName ??
+        PulseUserProfile.friendlyNameFromEmail(email) ??
+        'there';
+    final String avatarInitial =
+        profile?.avatarInitial ??
+        (PulseUserProfile.friendlyNameFromEmail(
+              email,
+            )?.substring(0, 1).toUpperCase() ??
+            'P');
+    final String avatarColour =
+        profile?.avatarColour ?? PulseUserProfile.defaultAvatarColour;
 
     final String authMessage;
     if (!isAuthenticated) {
       authMessage = 'No authenticated user is currently available.';
     } else if (email != null && email.isNotEmpty) {
-      authMessage = 'Signed in as $email';
+      authMessage = email;
     } else {
       authMessage = 'You are signed in to Pulse.';
     }
@@ -111,16 +131,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Home',
-                    style: textTheme.headlineLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    authMessage,
-                    style: textTheme.bodyLarge,
-                    textAlign: TextAlign.center,
+                  _HomeHeader(
+                    greetingName: greetingName,
+                    subtitle: authMessage,
+                    avatarInitial: avatarInitial,
+                    avatarColour: avatarColour,
+                    onProfilePressed: isAuthenticated
+                        ? () => context.goNamed(AppRoutes.profileName)
+                        : null,
                   ),
                   if (isAuthenticated) ...[
                     const SizedBox(height: 24),
@@ -176,6 +194,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: const Text('View history'),
                   ),
                   const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: isAuthenticated
+                        ? () => context.goNamed(AppRoutes.profileName)
+                        : null,
+                    child: const Text('Profile'),
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: _isSigningOut || !isAuthenticated
                         ? null
@@ -199,6 +224,65 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({
+    required this.greetingName,
+    required this.subtitle,
+    required this.avatarInitial,
+    required this.avatarColour,
+    required this.onProfilePressed,
+  });
+
+  final String greetingName;
+  final String subtitle;
+  final String avatarInitial;
+  final String avatarColour;
+  final VoidCallback? onProfilePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextTheme textTheme = theme.textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            PulseAvatar(
+              initial: avatarInitial,
+              avatarColour: avatarColour,
+              radius: 28,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Home', style: textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Welcome back, $greetingName',
+                    style: textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(subtitle, style: textTheme.bodyMedium),
+                ],
+              ),
+            ),
+            TextButton(onPressed: onProfilePressed, child: const Text('Edit')),
+          ],
         ),
       ),
     );

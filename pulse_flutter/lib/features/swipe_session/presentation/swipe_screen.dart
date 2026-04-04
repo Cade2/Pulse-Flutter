@@ -32,7 +32,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     if (updatedResponses.length == mockEmotionCards.length) {
       context.goNamed(
-        AppRoutes.swipeSessionCompleteName,
+        AppRoutes.contextTagsName,
         extra: SwipeSessionSummary(responses: updatedResponses),
       );
       return;

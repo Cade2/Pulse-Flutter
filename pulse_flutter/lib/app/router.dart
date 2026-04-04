@@ -5,7 +5,9 @@ import 'package:pulse_flutter/features/auth/presentation/login_screen.dart';
 import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
 import 'package:pulse_flutter/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pulse_flutter/features/splash/presentation/splash_screen.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
+import 'package:pulse_flutter/features/swipe_session/presentation/context_tag_screen.dart';
 import 'package:pulse_flutter/features/swipe_session/presentation/swipe_completion_screen.dart';
 import 'package:pulse_flutter/features/swipe_session/presentation/swipe_screen.dart';
 
@@ -24,6 +26,9 @@ abstract final class AppRoutes {
 
   static const String swipeSessionName = 'swipe-session';
   static const String swipeSessionPath = '/session';
+
+  static const String contextTagsName = 'context-tags';
+  static const String contextTagsPath = '/session/context';
 
   static const String swipeSessionCompleteName = 'swipe-session-complete';
   static const String swipeSessionCompletePath = '/session/complete';
@@ -66,12 +71,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SwipeScreen(),
       ),
       GoRoute(
-        path: AppRoutes.swipeSessionCompletePath,
-        name: AppRoutes.swipeSessionCompleteName,
+        path: AppRoutes.contextTagsPath,
+        name: AppRoutes.contextTagsName,
         builder: (context, state) {
           final SwipeSessionSummary? summary =
               state.extra as SwipeSessionSummary?;
-          return SwipeCompletionScreen(summary: summary);
+          return ContextTagScreen(summary: summary);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.swipeSessionCompletePath,
+        name: AppRoutes.swipeSessionCompleteName,
+        builder: (context, state) {
+          final SwipeSessionRecord? session =
+              state.extra as SwipeSessionRecord?;
+          return SwipeCompletionScreen(session: session);
         },
       ),
     ],

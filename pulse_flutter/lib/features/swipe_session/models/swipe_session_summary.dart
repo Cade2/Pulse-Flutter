@@ -27,4 +27,11 @@ class SwipeSessionSummary {
         .where((response) => response.decision == EmotionCardDecision.reject)
         .length;
   }
+
+  List<String> get acceptedEmotions {
+    return responses
+        .where((response) => response.decision == EmotionCardDecision.accept)
+        .map((response) => response.card.title)
+        .toList(growable: false);
+  }
 }

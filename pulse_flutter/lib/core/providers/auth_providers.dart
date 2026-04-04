@@ -30,6 +30,10 @@ final currentUserProvider = Provider<User?>((ref) {
   );
 });
 
+final currentUserIdProvider = Provider<String?>((ref) {
+  return ref.watch(currentUserProvider)?.uid;
+});
+
 final isAuthenticatedProvider = Provider<bool>((ref) {
   return ref.watch(currentUserProvider) != null;
 });

@@ -11,6 +11,20 @@ class PulseInsightCount {
   String get countText => count == 1 ? '1 time' : '$count times';
 }
 
+class PulseInsightPattern {
+  const PulseInsightPattern({
+    required this.emotion,
+    required this.contextTag,
+    required this.count,
+  });
+
+  final String emotion;
+  final String contextTag;
+  final int count;
+
+  String get countText => count == 1 ? '1 saved match' : '$count saved matches';
+}
+
 class PulseInsightsReport {
   static const int basicUnlockSessionCount = 5;
   static const int expandedUnlockSessionCount = 14;
@@ -23,6 +37,8 @@ class PulseInsightsReport {
     this.socialContexts = const <PulseInsightCount>[],
     this.energyTags = const <PulseInsightCount>[],
     this.sleepTags = const <PulseInsightCount>[],
+    this.weekdaySessions = const <PulseInsightCount>[],
+    this.emotionContextPatterns = const <PulseInsightPattern>[],
   });
 
   final int totalSessions;
@@ -32,6 +48,8 @@ class PulseInsightsReport {
   final List<PulseInsightCount> socialContexts;
   final List<PulseInsightCount> energyTags;
   final List<PulseInsightCount> sleepTags;
+  final List<PulseInsightCount> weekdaySessions;
+  final List<PulseInsightPattern> emotionContextPatterns;
 
   factory PulseInsightsReport.fromSessions(List<SwipeSessionRecord> sessions) {
     final List<PulseInsightCount> acceptedEmotionFrequency = _countValues(
@@ -49,6 +67,11 @@ class PulseInsightsReport {
     final List<PulseInsightCount> sleepTags = _countValues(
       sessions.map((session) => session.contextSleep),
     );
+    final List<PulseInsightCount> weekdaySessions = _countValues(
+      sessions.map((session) => _weekdayLabel(session.completedAt.weekday)),
+    );
+    final List<PulseInsightPattern> emotionContextPatterns =
+        _countEmotionContextPatterns(sessions);
 
     return PulseInsightsReport(
       totalSessions: sessions.length,
@@ -61,6 +84,8 @@ class PulseInsightsReport {
       socialContexts: socialContexts,
       energyTags: energyTags,
       sleepTags: sleepTags,
+      weekdaySessions: weekdaySessions,
+      emotionContextPatterns: emotionContextPatterns,
     );
   }
 
@@ -134,6 +159,22 @@ class PulseInsightsReport {
     return sleepTags.first;
   }
 
+  PulseInsightCount? get mostActiveWeekday {
+    if (weekdaySessions.isEmpty) {
+      return null;
+    }
+
+    return weekdaySessions.first;
+  }
+
+  PulseInsightPattern? get topEmotionContextPattern {
+    if (emotionContextPatterns.isEmpty) {
+      return null;
+    }
+
+    return emotionContextPatterns.first;
+  }
+
   int progressToward(int unlockSessionCount) {
     if (totalSessions >= unlockSessionCount) {
       return unlockSessionCount;
@@ -173,5 +214,64 @@ class PulseInsightsReport {
     });
 
     return ranked;
+  }
+
+  static List<PulseInsightPattern> _countEmotionContextPatterns(
+    List<SwipeSessionRecord> sessions,
+  ) {
+    final Map<String, PulseInsightPattern> patterns =
+        <String, PulseInsightPattern>{};
+
+    for (final SwipeSessionRecord session in sessions) {
+      if (session.acceptedEmotions.isEmpty || session.contextTags.isEmpty) {
+        continue;
+      }
+
+      for (final String emotion in session.acceptedEmotions) {
+        for (final String contextTag in session.contextTags) {
+          final String key = '$emotion|$contextTag';
+          final PulseInsightPattern? existing = patterns[key];
+          patterns[key] = PulseInsightPattern(
+            emotion: emotion,
+            contextTag: contextTag,
+            count: existing == null ? 1 : existing.count + 1,
+          );
+        }
+      }
+    }
+
+    final List<PulseInsightPattern> ranked = patterns.values.toList(
+      growable: false,
+    );
+
+    ranked.sort((lhs, rhs) {
+      final int countCompare = rhs.count.compareTo(lhs.count);
+      if (countCompare != 0) {
+        return countCompare;
+      }
+
+      final int emotionCompare = lhs.emotion.compareTo(rhs.emotion);
+      if (emotionCompare != 0) {
+        return emotionCompare;
+      }
+
+      return lhs.contextTag.compareTo(rhs.contextTag);
+    });
+
+    return ranked;
+  }
+
+  static String _weekdayLabel(int weekday) {
+    const List<String> weekdayNames = <String>[
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    return weekdayNames[weekday - 1];
   }
 }

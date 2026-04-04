@@ -23,7 +23,7 @@ class InsightsScreen extends ConsumerWidget {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
+                  constraints: const BoxConstraints(maxWidth: 560),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -34,10 +34,12 @@ class InsightsScreen extends ConsumerWidget {
                       else ...[
                         _OverviewCard(report: report),
                         const SizedBox(height: 16),
+                        _ContextBreakdownCard(report: report),
+                        const SizedBox(height: 16),
                         _InsightListCard(
                           title: 'Top accepted emotions',
                           items: report.acceptedEmotionFrequency
-                              .take(4)
+                              .take(5)
                               .toList(growable: false),
                           emptyMessage:
                               'No accepted emotions have been saved yet.',
@@ -52,7 +54,21 @@ class InsightsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
                         if (report.hasExpandedInsights)
-                          _ExpandedPatternsCard(report: report)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _ExpandedPatternsCard(report: report),
+                              const SizedBox(height: 16),
+                              _InsightListCard(
+                                title: 'Session rhythm',
+                                items: report.weekdaySessions,
+                                emptyMessage:
+                                    'A weekday rhythm will appear once enough sessions are saved.',
+                              ),
+                              const SizedBox(height: 16),
+                              _EmotionContextPatternsCard(report: report),
+                            ],
+                          )
                         else
                           _ExpandedUnlockCard(report: report),
                       ],
@@ -183,6 +199,7 @@ class _OverviewCard extends StatelessWidget {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final PulseInsightCount? topEmotion = report.topAcceptedEmotion;
     final PulseInsightCount? topContextTag = report.topContextTag;
+    final PulseInsightCount? topWeekday = report.mostActiveWeekday;
 
     return _InsightsCard(
       child: Column(
@@ -195,6 +212,12 @@ class _OverviewCard extends StatelessWidget {
             value: '${report.totalSessions}',
             supporting:
                 '${report.totalAcceptedEmotions} accepted emotions saved',
+          ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Average accepted per session',
+            value: _formatAverage(report.averageAcceptedPerSession),
+            supporting: 'Across your saved Pulse history so far.',
           ),
           const SizedBox(height: 12),
           _InsightRow(
@@ -211,6 +234,63 @@ class _OverviewCard extends StatelessWidget {
             supporting: topContextTag == null
                 ? 'Optional context tags will appear here once they are saved.'
                 : topContextTag.countText,
+          ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Most active weekday',
+            value: topWeekday?.label ?? 'No rhythm yet',
+            supporting: topWeekday == null
+                ? 'Weekday patterns will appear once more history is saved.'
+                : topWeekday.countText,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatAverage(double value) {
+    final bool isWholeNumber = value == value.roundToDouble();
+    return isWholeNumber ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+  }
+}
+
+class _ContextBreakdownCard extends StatelessWidget {
+  const _ContextBreakdownCard({required this.report});
+
+  final PulseInsightsReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Context breakdown', style: textTheme.titleLarge),
+          const SizedBox(height: 16),
+          _InsightRow(
+            label: 'Social context',
+            value: report.topSocialContext?.label ?? 'No social tags yet',
+            supporting:
+                report.topSocialContext?.countText ??
+                'Social context will appear here when it is saved.',
+          ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Energy pattern',
+            value: report.topEnergyTag?.label ?? 'No energy tags yet',
+            supporting:
+                report.topEnergyTag?.countText ??
+                'Energy tags will appear here when they are saved.',
+          ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Sleep pattern',
+            value: report.topSleepTag?.label ?? 'No sleep tags yet',
+            supporting:
+                report.topSleepTag?.countText ??
+                'Sleep tags will appear here when they are saved.',
           ),
         ],
       ),
@@ -271,6 +351,8 @@ class _ExpandedPatternsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final TextTheme textTheme = Theme.of(context).textTheme;
+    final PulseInsightCount? topWeekday = report.mostActiveWeekday;
+    final PulseInsightPattern? topPattern = report.topEmotionContextPattern;
 
     return _InsightsCard(
       child: Column(
@@ -282,6 +364,12 @@ class _ExpandedPatternsCard extends StatelessWidget {
             label: 'Average accepted per session',
             value: _formatAverage(report.averageAcceptedPerSession),
             supporting: 'Based on your saved Pulse history.',
+          ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Most active weekday',
+            value: topWeekday?.label ?? 'No weekday signal yet',
+            supporting: topWeekday?.countText ?? '',
           ),
           const SizedBox(height: 12),
           _InsightRow(
@@ -301,6 +389,16 @@ class _ExpandedPatternsCard extends StatelessWidget {
             value: report.topSleepTag?.label ?? 'No sleep tags yet',
             supporting: report.topSleepTag?.countText ?? '',
           ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Strongest emotion + context signal',
+            value: topPattern == null
+                ? 'No paired signal yet'
+                : '${topPattern.emotion} + ${topPattern.contextTag}',
+            supporting:
+                topPattern?.countText ??
+                'A repeated emotion + context signal will appear here when enough context is saved.',
+          ),
         ],
       ),
     );
@@ -309,6 +407,49 @@ class _ExpandedPatternsCard extends StatelessWidget {
   String _formatAverage(double value) {
     final bool isWholeNumber = value == value.roundToDouble();
     return isWholeNumber ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+  }
+}
+
+class _EmotionContextPatternsCard extends StatelessWidget {
+  const _EmotionContextPatternsCard({required this.report});
+
+  final PulseInsightsReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final List<PulseInsightPattern> patterns = report.emotionContextPatterns
+        .take(3)
+        .toList(growable: false);
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Repeated emotion + context signals',
+            style: textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+          if (patterns.isEmpty)
+            Text(
+              'Save sessions with context tags to surface repeated emotion + context pairings.',
+              style: textTheme.bodyMedium,
+            )
+          else
+            ...patterns.map((pattern) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _InsightRow(
+                  label: pattern.emotion,
+                  value: pattern.contextTag,
+                  supporting: pattern.countText,
+                ),
+              );
+            }),
+        ],
+      ),
+    );
   }
 }
 

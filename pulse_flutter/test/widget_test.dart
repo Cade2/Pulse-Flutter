@@ -265,6 +265,94 @@ void main() {
     );
   });
 
+  testWidgets(
+    'insights screen shows richer basic insights after five sessions',
+    (WidgetTester tester) async {
+      final _FakeSwipeSessionRepository fakeRepository =
+          _FakeSwipeSessionRepository(
+            sessions: [
+              _buildSessionRecord(
+                date: '2026-04-01',
+                acceptedEmotions: const ['Calm', 'Joy'],
+                contextSocial: 'Friends',
+                contextEnergy: 'Steady',
+              ),
+              _buildSessionRecord(
+                date: '2026-04-03',
+                acceptedEmotions: const ['Calm'],
+                contextSocial: 'Friends',
+                contextSleep: 'Good',
+              ),
+              _buildSessionRecord(
+                date: '2026-04-08',
+                acceptedEmotions: const ['Focus'],
+                contextEnergy: 'High',
+              ),
+              _buildSessionRecord(
+                date: '2026-04-10',
+                acceptedEmotions: const ['Calm', 'Hope'],
+                contextSocial: 'Friends',
+                contextSleep: 'Good',
+              ),
+              _buildSessionRecord(
+                date: '2026-04-15',
+                acceptedEmotions: const ['Joy'],
+                contextSocial: 'Friends',
+                contextEnergy: 'Steady',
+              ),
+            ],
+          );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => 'test-user'),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            currentUserProfileProvider.overrideWith(
+              (ref) => Stream.value(
+                _buildProfile(
+                  displayName: 'Ava',
+                  email: 'ava@example.com',
+                  avatarColour: '#EC4899',
+                ),
+              ),
+            ),
+            currentUserStreakProvider.overrideWith(
+              (ref) => const PulseStreak(),
+            ),
+            currentUserLevelProgressProvider.overrideWith(
+              (ref) => const PulseLevelProgress(),
+            ),
+            swipeSessionRepositoryProvider.overrideWith(
+              (ref) => fakeRepository,
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Insights'));
+      await tester.tap(find.text('Insights').last);
+      await tester.pumpAndSettle();
+
+      expect(_selectedBottomNavIndex(tester), 2);
+      expect(find.text('Overview'), findsOneWidget);
+      expect(find.text('Context breakdown'), findsOneWidget);
+      expect(find.text('Top accepted emotions'), findsOneWidget);
+      expect(find.text('Most common context tags'), findsOneWidget);
+      expect(find.text('Most active weekday'), findsOneWidget);
+      expect(find.text('Wednesday'), findsOneWidget);
+      expect(find.text('Friends'), findsWidgets);
+      expect(find.text('Steady'), findsOneWidget);
+      expect(find.text('Good'), findsOneWidget);
+      expect(find.text('More patterns unlock at 14 sessions'), findsOneWidget);
+      expect(find.text('Session rhythm'), findsNothing);
+    },
+  );
+
   testWidgets('insights screen shows expanded patterns from saved history', (
     WidgetTester tester,
   ) async {
@@ -328,23 +416,28 @@ void main() {
 
     expect(_selectedBottomNavIndex(tester), 2);
     expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('Context breakdown'), findsOneWidget);
     expect(find.text('Top accepted emotions'), findsOneWidget);
     expect(find.text('Most common context tags'), findsOneWidget);
     expect(find.text('Pattern signals'), findsOneWidget);
+    expect(find.text('Session rhythm'), findsOneWidget);
+    expect(find.text('Repeated emotion + context signals'), findsOneWidget);
     expect(find.text('14 sessions saved'), findsOneWidget);
     expect(find.text('Calm'), findsWidgets);
-    expect(find.text('Social: Friends'), findsOneWidget);
+    expect(find.text('Social: Friends'), findsWidgets);
     expect(find.text('Most common social context'), findsOneWidget);
-    expect(find.text('Friends'), findsOneWidget);
-    expect(find.text('Steady'), findsOneWidget);
-    expect(find.text('Good'), findsOneWidget);
+    expect(find.text('Most active weekday'), findsWidgets);
+    expect(find.text('Strongest emotion + context signal'), findsOneWidget);
+    expect(find.text('Friends'), findsWidgets);
+    expect(find.text('Steady'), findsWidgets);
+    expect(find.text('Good'), findsWidgets);
     expect(
       find.text(
         _formatInsightAverage(
           23 / PulseInsightsReport.expandedUnlockSessionCount,
         ),
       ),
-      findsOneWidget,
+      findsWidgets,
     );
   });
 

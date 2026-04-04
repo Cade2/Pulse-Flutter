@@ -39,24 +39,24 @@ void main() {
           contextEnergy: 'Steady',
         ),
         _buildInsightSession(
-          date: '2026-04-02',
+          date: '2026-04-03',
           acceptedEmotions: const ['Calm'],
           contextSocial: 'Friends',
           contextSleep: 'Good',
         ),
         _buildInsightSession(
-          date: '2026-04-03',
+          date: '2026-04-08',
           acceptedEmotions: const ['Focus'],
           contextEnergy: 'High',
         ),
         _buildInsightSession(
-          date: '2026-04-04',
+          date: '2026-04-10',
           acceptedEmotions: const ['Calm', 'Hope'],
-          contextSocial: 'Solo',
+          contextSocial: 'Friends',
           contextSleep: 'Good',
         ),
         _buildInsightSession(
-          date: '2026-04-05',
+          date: '2026-04-15',
           acceptedEmotions: const ['Joy'],
           contextSocial: 'Friends',
           contextEnergy: 'Steady',
@@ -69,7 +69,15 @@ void main() {
     expect(report.topAcceptedEmotion?.label, 'Calm');
     expect(report.topAcceptedEmotion?.count, 3);
     expect(report.topContextTag?.label, 'Social: Friends');
-    expect(report.topContextTag?.count, 3);
+    expect(report.topContextTag?.count, 4);
+    expect(report.mostActiveWeekday?.label, 'Wednesday');
+    expect(report.mostActiveWeekday?.count, 3);
+    expect(report.topSocialContext?.label, 'Friends');
+    expect(report.topEnergyTag?.label, 'Steady');
+    expect(report.topSleepTag?.label, 'Good');
+    expect(report.topEmotionContextPattern?.emotion, 'Calm');
+    expect(report.topEmotionContextPattern?.contextTag, 'Social: Friends');
+    expect(report.topEmotionContextPattern?.count, 3);
   });
 
   test(
@@ -105,6 +113,10 @@ void main() {
       expect(report.topSocialContext?.label, 'Friends');
       expect(report.topEnergyTag?.label, 'Steady');
       expect(report.topSleepTag?.label, 'Good');
+      expect(report.weekdaySessions, isNotEmpty);
+      expect(report.topEmotionContextPattern?.emotion, 'Calm');
+      expect(report.topEmotionContextPattern?.contextTag, 'Energy: Steady');
+      expect(report.topEmotionContextPattern?.count, 9);
       expect(report.averageAcceptedPerSession, closeTo(23 / 14, 0.0001));
     },
   );

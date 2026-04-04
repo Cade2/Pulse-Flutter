@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
 
@@ -38,13 +39,29 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
       contextEnergy: contextEnergy,
       contextSleep: contextSleep,
     );
-
-    await _firestore
+    final DocumentReference<Map<String, dynamic>> userDocument = _firestore
         .collection('users')
-        .doc(uid)
+        .doc(uid);
+    final DocumentReference<Map<String, dynamic>> sessionDocument = userDocument
         .collection('sessions')
-        .doc(record.sessionId)
-        .set(record.toFirestore());
+        .doc(record.sessionId);
+
+    await _firestore.runTransaction((transaction) async {
+      final DocumentSnapshot<Map<String, dynamic>> userSnapshot =
+          await transaction.get(userDocument);
+      final Map<String, dynamic> userData =
+          userSnapshot.data() ?? <String, dynamic>{};
+      final PulseStreak nextStreak = PulseStreak.fromFirestoreData(
+        userData,
+      ).recordCompletion(record.sessionId);
+
+      transaction.set(sessionDocument, record.toFirestore());
+      transaction.set(
+        userDocument,
+        nextStreak.toFirestore(),
+        SetOptions(merge: true),
+      );
+    });
 
     return record;
   }

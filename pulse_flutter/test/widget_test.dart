@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
+import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
+import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 import 'package:pulse_flutter/features/swipe_session/models/emotion_card.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
@@ -54,6 +56,7 @@ void main() {
         overrides: [
           currentUserProvider.overrideWith((ref) => null),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
         ],
         child: const PulseApp(),
       ),
@@ -63,6 +66,8 @@ void main() {
 
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Splash'), findsNothing);
+    expect(find.text('Current streak'), findsOneWidget);
+    expect(find.text('0 days'), findsOneWidget);
   });
 
   testWidgets('home shows done-for-today state when today already exists', (
@@ -85,6 +90,13 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 4,
+              longestStreak: 6,
+              lastSessionDate: '2026-04-04',
+            ),
+          ),
           currentSessionDateProvider.overrideWith(
             (ref) => DateTime(2026, 4, 4),
           ),
@@ -98,6 +110,7 @@ void main() {
 
     expect(find.text('Done for today'), findsOneWidget);
     expect(find.text('Today\'s session is complete'), findsOneWidget);
+    expect(find.text('4 days'), findsOneWidget);
     expect(find.text('Accepted emotions'), findsOneWidget);
     expect(find.text('Calm'), findsOneWidget);
     expect(find.text('Joy'), findsOneWidget);
@@ -122,6 +135,13 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 2,
+              longestStreak: 3,
+              lastSessionDate: '2026-04-04',
+            ),
+          ),
           currentSessionDateProvider.overrideWith(
             (ref) => DateTime(2026, 4, 4),
           ),
@@ -150,6 +170,7 @@ void main() {
         overrides: [
           currentUserProvider.overrideWith((ref) => null),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
         ],
         child: const PulseApp(),
       ),
@@ -188,6 +209,7 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),
@@ -266,6 +288,13 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 3,
+              longestStreak: 5,
+              lastSessionDate: '2026-04-04',
+            ),
+          ),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),
@@ -311,6 +340,13 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 3,
+              longestStreak: 5,
+              lastSessionDate: '2026-04-04',
+            ),
+          ),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),
@@ -350,6 +386,7 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),

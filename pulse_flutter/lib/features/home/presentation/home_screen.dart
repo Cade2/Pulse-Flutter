@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
+import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -62,6 +63,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final User? currentUser = ref.watch(currentUserProvider);
     final bool isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final int currentStreak = ref
+        .watch(currentUserStreakProvider)
+        .currentStreak;
     final AsyncValue<SwipeSessionRecord?> todaySessionAsync = ref.watch(
       todaySwipeSessionProvider,
     );
@@ -116,6 +120,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   if (isAuthenticated) ...[
                     const SizedBox(height: 24),
+                    _StreakSummaryCard(currentStreak: currentStreak),
+                    const SizedBox(height: 16),
                     _TodaySessionStatusCard(
                       todaySessionAsync: todaySessionAsync,
                     ),
@@ -187,6 +193,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StreakSummaryCard extends StatelessWidget {
+  const _StreakSummaryCard({required this.currentStreak});
+
+  final int currentStreak;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextTheme textTheme = theme.textTheme;
+    final String dayLabel = currentStreak == 1 ? 'day' : 'days';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Current streak', style: textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text('$currentStreak $dayLabel', style: textTheme.headlineMedium),
+            const SizedBox(height: 8),
+            Text(
+              currentStreak > 0
+                  ? 'Keep showing up each day to grow your Pulse streak.'
+                  : 'Complete a daily session to start your Pulse streak.',
+              style: textTheme.bodyMedium,
+            ),
+          ],
         ),
       ),
     );

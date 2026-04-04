@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
+import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -20,6 +21,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _hasInitializedForm = false;
   bool _isSaving = false;
   String _selectedAvatarColour = PulseUserProfile.defaultAvatarColour;
+  String _selectedReminderTime =
+      PulseProfileSettings.defaultPreferredReminderTime;
+  bool _dailyRemindersEnabled =
+      PulseProfileSettings.defaultDailyRemindersEnabled;
+  bool _streakRemindersEnabled =
+      PulseProfileSettings.defaultStreakRemindersEnabled;
+  bool _weeklySummaryEnabled = PulseProfileSettings.defaultWeeklySummaryEnabled;
+  PulseAppearanceMode _appearanceMode =
+      PulseProfileSettings.defaultAppearanceMode;
   String? _errorMessage;
   String? _successMessage;
 
@@ -52,6 +62,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             uid: uid,
             displayName: _displayNameController.text,
             avatarColour: _selectedAvatarColour,
+            settings: PulseProfileSettings(
+              preferredReminderTime: _selectedReminderTime,
+              dailyRemindersEnabled: _dailyRemindersEnabled,
+              streakRemindersEnabled: _streakRemindersEnabled,
+              weeklySummaryEnabled: _weeklySummaryEnabled,
+              appearanceMode: _appearanceMode,
+            ),
           );
 
       if (!mounted) {
@@ -59,7 +76,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
 
       setState(() {
-        _successMessage = 'Profile updated.';
+        _successMessage = 'Profile settings updated.';
       });
     } catch (_) {
       if (!mounted) {
@@ -85,7 +102,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     _displayNameController.text = profile.displayName ?? '';
     _selectedAvatarColour = profile.avatarColour;
+    _selectedReminderTime = profile.settings.preferredReminderTime;
+    _dailyRemindersEnabled = profile.settings.dailyRemindersEnabled;
+    _streakRemindersEnabled = profile.settings.streakRemindersEnabled;
+    _weeklySummaryEnabled = profile.settings.weeklySummaryEnabled;
+    _appearanceMode = profile.settings.appearanceMode;
     _hasInitializedForm = true;
+  }
+
+  Future<void> _pickReminderTime() async {
+    final TimeOfDay initialTime = PulseProfileSettings.timeOfDayFromStorage(
+      _selectedReminderTime,
+    );
+    final TimeOfDay? selectedTime = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+    );
+
+    if (selectedTime == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedReminderTime = PulseProfileSettings.formatStorageTime(
+        selectedTime,
+      );
+      _successMessage = null;
+    });
   }
 
   @override
@@ -143,7 +186,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
+                  constraints: const BoxConstraints(maxWidth: 520),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -167,58 +210,180 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 32),
-                      TextField(
-                        controller: _displayNameController,
-                        textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(
-                          labelText: 'Display name',
-                          hintText: 'How Pulse should greet you',
+                      _ProfileSectionCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text('Profile basics', style: textTheme.titleLarge),
+                            const SizedBox(height: 20),
+                            TextField(
+                              controller: _displayNameController,
+                              textInputAction: TextInputAction.done,
+                              decoration: const InputDecoration(
+                                labelText: 'Display name',
+                                hintText: 'How Pulse should greet you',
+                              ),
+                              onChanged: (_) {
+                                setState(() {
+                                  _successMessage = null;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            Text('Avatar colour', style: textTheme.titleMedium),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: PulseUserProfile.avatarColourOptions
+                                  .map((color) {
+                                    final bool isSelected =
+                                        _selectedAvatarColour == color;
+                                    final Color swatchColor =
+                                        PulseUserProfile.colorFromHex(color);
+
+                                    return InkWell(
+                                      onTap: _isSaving
+                                          ? null
+                                          : () {
+                                              setState(() {
+                                                _selectedAvatarColour = color;
+                                                _successMessage = null;
+                                              });
+                                            },
+                                      borderRadius: BorderRadius.circular(999),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: swatchColor,
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? Colors.white
+                                                : swatchColor.withValues(
+                                                    alpha: 0.35,
+                                                  ),
+                                            width: isSelected ? 3 : 1,
+                                          ),
+                                        ),
+                                        child: isSelected
+                                            ? const Icon(Icons.check_rounded)
+                                            : null,
+                                      ),
+                                    );
+                                  })
+                                  .toList(growable: false),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 24),
-                      Text('Avatar colour', style: textTheme.titleMedium),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: PulseUserProfile.avatarColourOptions
-                            .map((color) {
-                              final bool isSelected =
-                                  _selectedAvatarColour == color;
-                              final Color swatchColor =
-                                  PulseUserProfile.colorFromHex(color);
-
-                              return InkWell(
-                                onTap: _isSaving
-                                    ? null
-                                    : () {
-                                        setState(() {
-                                          _selectedAvatarColour = color;
-                                          _successMessage = null;
-                                        });
-                                      },
-                                borderRadius: BorderRadius.circular(999),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: swatchColor,
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? Colors.white
-                                          : swatchColor.withValues(alpha: 0.35),
-                                      width: isSelected ? 3 : 1,
-                                    ),
+                      _ProfileSectionCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text('Settings', style: textTheme.titleLarge),
+                            const SizedBox(height: 20),
+                            Text('Reminder time', style: textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Save the time you would like Pulse to use for future nudges.',
+                              style: textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: _isSaving ? null : _pickReminderTime,
+                              icon: const Icon(Icons.schedule_rounded),
+                              label: Text(
+                                PulseProfileSettings.formatDisplayTime(
+                                  PulseProfileSettings.timeOfDayFromStorage(
+                                    _selectedReminderTime,
                                   ),
-                                  child: isSelected
-                                      ? const Icon(Icons.check_rounded)
-                                      : null,
                                 ),
-                              );
-                            })
-                            .toList(growable: false),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Daily reminders'),
+                              subtitle: const Text(
+                                'Keep a daily Pulse check-in reminder ready.',
+                              ),
+                              value: _dailyRemindersEnabled,
+                              onChanged: _isSaving
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        _dailyRemindersEnabled = value;
+                                        _successMessage = null;
+                                      });
+                                    },
+                            ),
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Streak reminders'),
+                              subtitle: const Text(
+                                'Highlight when your streak could use a nudge.',
+                              ),
+                              value: _streakRemindersEnabled,
+                              onChanged: _isSaving
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        _streakRemindersEnabled = value;
+                                        _successMessage = null;
+                                      });
+                                    },
+                            ),
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Weekly summary'),
+                              subtitle: const Text(
+                                'Save a spot for future weekly Pulse recaps.',
+                              ),
+                              value: _weeklySummaryEnabled,
+                              onChanged: _isSaving
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        _weeklySummaryEnabled = value;
+                                        _successMessage = null;
+                                      });
+                                    },
+                            ),
+                            const SizedBox(height: 20),
+                            Text('Appearance', style: textTheme.titleMedium),
+                            const SizedBox(height: 12),
+                            SegmentedButton<PulseAppearanceMode>(
+                              showSelectedIcon: false,
+                              segments: PulseAppearanceMode.values
+                                  .map((mode) {
+                                    return ButtonSegment<PulseAppearanceMode>(
+                                      value: mode,
+                                      label: Text(mode.label),
+                                    );
+                                  })
+                                  .toList(growable: false),
+                              selected: <PulseAppearanceMode>{_appearanceMode},
+                              onSelectionChanged: _isSaving
+                                  ? null
+                                  : (selection) {
+                                      if (selection.isEmpty) {
+                                        return;
+                                      }
+
+                                      setState(() {
+                                        _appearanceMode = selection.first;
+                                        _successMessage = null;
+                                      });
+                                    },
+                            ),
+                          ],
+                        ),
                       ),
                       if (_errorMessage != null) ...[
                         const SizedBox(height: 24),
@@ -255,7 +420,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('Save profile'),
+                            : const Text('Save changes'),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton(
@@ -298,6 +463,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           },
         ),
       ),
+    );
+  }
+}
+
+class _ProfileSectionCard extends StatelessWidget {
+  const _ProfileSectionCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(padding: const EdgeInsets.all(20), child: child),
     );
   }
 }

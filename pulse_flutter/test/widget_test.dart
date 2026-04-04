@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,9 +9,11 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
+import 'package:pulse_flutter/core/firestore/user_profile_repository.dart';
 import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_insights.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
+import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
@@ -133,8 +137,90 @@ void main() {
     expect(_selectedBottomNavIndex(tester), 4);
     expect(find.text('Profile'), findsWidgets);
     expect(find.text('ava@example.com'), findsOneWidget);
-    expect(find.text('Save profile'), findsOneWidget);
+    expect(find.text('Profile basics'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Reminder time'), findsOneWidget);
+    expect(find.text('Daily reminders'), findsOneWidget);
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Save changes'), findsOneWidget);
     expect(find.text('Ava'), findsWidgets);
+  });
+
+  testWidgets('profile settings save and reload correctly', (
+    WidgetTester tester,
+  ) async {
+    final StreamController<PulseUserProfile?> profileController =
+        StreamController<PulseUserProfile?>.broadcast();
+    addTearDown(profileController.close);
+
+    final PulseUserProfile initialProfile = _buildProfile(
+      displayName: 'Ava',
+      email: 'ava@example.com',
+      avatarColour: '#EC4899',
+    );
+    final _FakeUserProfileRepository fakeRepository =
+        _FakeUserProfileRepository(
+          initialProfile: initialProfile,
+          profileController: profileController,
+        );
+    Stream<PulseUserProfile?> profileStream() async* {
+      yield initialProfile;
+      yield* profileController.stream;
+    }
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith((ref) => profileStream()),
+          userProfileRepositoryProvider.overrideWith((ref) => fakeRepository),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Profile'));
+    await tester.tap(find.text('Profile').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('8:00 PM'), findsOneWidget);
+    expect(find.text('Dark'), findsWidgets);
+
+    await tester.ensureVisible(find.text('Weekly summary'));
+    await tester.tap(find.text('Weekly summary'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Light').last);
+    await tester.tap(find.text('Light').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Ava Stone');
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(fakeRepository.lastUpdatedUid, 'test-user');
+    expect(fakeRepository.lastDisplayName, 'Ava Stone');
+    expect(fakeRepository.lastAvatarColour, '#EC4899');
+    expect(fakeRepository.lastSettings, isNotNull);
+    expect(fakeRepository.lastSettings!.preferredReminderTime, '20:00');
+    expect(fakeRepository.lastSettings!.dailyRemindersEnabled, isTrue);
+    expect(fakeRepository.lastSettings!.streakRemindersEnabled, isTrue);
+    expect(fakeRepository.lastSettings!.weeklySummaryEnabled, isTrue);
+    expect(
+      fakeRepository.lastSettings!.appearanceMode,
+      PulseAppearanceMode.light,
+    );
+    expect(find.text('Profile settings updated.'), findsOneWidget);
+    expect(find.text('Ava Stone'), findsWidgets);
   });
 
   testWidgets('badge screen is reachable from profile and shows progress', (
@@ -1138,12 +1224,14 @@ PulseUserProfile _buildProfile({
   required String email,
   String? displayName,
   String avatarColour = PulseUserProfile.defaultAvatarColour,
+  PulseProfileSettings settings = const PulseProfileSettings(),
 }) {
   return PulseUserProfile(
     uid: 'test-user',
     email: email,
     displayName: displayName,
     avatarColour: avatarColour,
+    settings: settings,
   );
 }
 
@@ -1182,6 +1270,68 @@ SwipeSessionRecord _buildSessionRecord({
     contextSleep: contextSleep,
     completedAt: DateTime.parse('$date 12:00:00'),
   );
+}
+
+class _FakeUserProfileRepository implements UserProfileRepository {
+  _FakeUserProfileRepository({
+    required PulseUserProfile initialProfile,
+    required StreamController<PulseUserProfile?> profileController,
+  }) : _currentProfile = initialProfile,
+       _profileController = profileController;
+
+  PulseUserProfile _currentProfile;
+  final StreamController<PulseUserProfile?> _profileController;
+  String? lastUpdatedUid;
+  String? lastDisplayName;
+  String? lastAvatarColour;
+  PulseProfileSettings? lastSettings;
+
+  @override
+  Future<PulseUserProfile?> fetchUserProfile(String uid) async {
+    return _currentProfile;
+  }
+
+  @override
+  Stream<PulseUserProfile?> watchUserProfile(String uid) {
+    return _profileController.stream;
+  }
+
+  @override
+  Future<void> ensureUserProfile(User user) async {}
+
+  @override
+  Future<void> updateProfile({
+    required String uid,
+    String? displayName,
+    required String avatarColour,
+    required PulseProfileSettings settings,
+  }) async {
+    lastUpdatedUid = uid;
+    lastDisplayName = displayName?.trim();
+    lastAvatarColour = avatarColour;
+    lastSettings = settings;
+    _currentProfile = PulseUserProfile(
+      uid: _currentProfile.uid,
+      email: _currentProfile.email,
+      displayName: displayName?.trim(),
+      avatarColour: avatarColour,
+      currentStreak: _currentProfile.currentStreak,
+      longestStreak: _currentProfile.longestStreak,
+      lastSessionDate: _currentProfile.lastSessionDate,
+      totalXp: _currentProfile.totalXp,
+      currentLevel: _currentProfile.currentLevel,
+      unlockedBadgeIds: _currentProfile.unlockedBadgeIds,
+      settings: settings,
+      createdAt: _currentProfile.createdAt,
+      lastSeenAt: _currentProfile.lastSeenAt,
+    );
+    _profileController.add(_currentProfile);
+  }
+
+  @override
+  DocumentReference<Map<String, dynamic>> userDocument(String uid) {
+    throw UnimplementedError();
+  }
 }
 
 class _FakeSwipeSessionRepository implements SwipeSessionRepository {

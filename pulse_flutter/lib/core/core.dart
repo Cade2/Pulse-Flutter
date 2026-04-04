@@ -6,6 +6,7 @@ export 'models/pulse_badge.dart';
 export 'models/pulse_insights.dart';
 export 'models/pulse_streak.dart';
 export 'models/pulse_level_progress.dart';
+export 'models/pulse_profile_settings.dart';
 export 'models/pulse_session_history_entry.dart';
 export 'providers/auth_providers.dart';
 export 'providers/badge_providers.dart';

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
+import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
@@ -51,6 +52,9 @@ class UserProfileRepository {
       final PulseStreak streak = PulseStreak.fromFirestoreData(existingData);
       final PulseLevelProgress levelProgress =
           PulseLevelProgress.fromFirestoreData(existingData);
+      final PulseProfileSettings settings = _resolveSettings(
+        existingData['settings'],
+      );
 
       final Map<String, Object?> payload = <String, Object?>{
         'uid': bootstrapProfile.uid,
@@ -68,6 +72,7 @@ class UserProfileRepository {
         'unlockedBadgeIds': _resolveStoredBadgeIds(
           existingData['unlockedBadgeIds'],
         ),
+        'settings': settings.toFirestore(),
         'lastSeenAt': FieldValue.serverTimestamp(),
       };
 
@@ -83,10 +88,12 @@ class UserProfileRepository {
     required String uid,
     String? displayName,
     required String avatarColour,
+    required PulseProfileSettings settings,
   }) async {
     await userDocument(uid).set(<String, Object?>{
       'displayName': _trimToNull(displayName),
       'avatarColour': PulseUserProfile.normalizeAvatarColour(avatarColour),
+      'settings': settings.toFirestore(),
     }, SetOptions(merge: true));
   }
 
@@ -112,6 +119,9 @@ class UserProfileRepository {
       streak: reconciledStreak,
       levelProgress: reconciledLevelProgress,
     );
+    final PulseProfileSettings reconciledSettings = _resolveSettings(
+      data['settings'],
+    );
 
     final bool streakNeedsWriteback = !profile.streak.matches(reconciledStreak);
     final bool levelNeedsWriteback =
@@ -124,23 +134,29 @@ class UserProfileRepository {
     final bool avatarNeedsWriteback = PulseUserProfile.needsAvatarColourRepair(
       data['avatarColour'],
     );
+    final bool settingsNeedWriteback = PulseProfileSettings.needsRepair(
+      data['settings'],
+    );
 
     if (streakNeedsWriteback ||
         levelNeedsWriteback ||
         badgesNeedWriteback ||
-        avatarNeedsWriteback) {
+        avatarNeedsWriteback ||
+        settingsNeedWriteback) {
       await userDocument(uid).set(<String, Object?>{
         if (streakNeedsWriteback) ...reconciledStreak.toFirestore(),
         if (levelNeedsWriteback) ...reconciledLevelProgress.toFirestore(),
         if (badgesNeedWriteback) 'unlockedBadgeIds': reconciledBadgeIds,
         if (avatarNeedsWriteback) 'avatarColour': profile.avatarColour,
+        if (settingsNeedWriteback) 'settings': reconciledSettings.toFirestore(),
       }, SetOptions(merge: true));
     }
 
     return profile
         .withStreak(reconciledStreak)
         .withLevelProgress(reconciledLevelProgress)
-        .withUnlockedBadgeIds(reconciledBadgeIds);
+        .withUnlockedBadgeIds(reconciledBadgeIds)
+        .withSettings(reconciledSettings);
   }
 
   Future<List<PulseSessionHistoryEntry>> _readSessionHistory(String uid) async {
@@ -206,6 +222,10 @@ class UserProfileRepository {
 
   String _resolveAvatarColour(Object? existingValue) {
     return PulseUserProfile.normalizeAvatarColour(existingValue);
+  }
+
+  PulseProfileSettings _resolveSettings(Object? existingValue) {
+    return PulseProfileSettings.fromFirestoreData(existingValue);
   }
 
   List<String> _resolveStoredBadgeIds(Object? value) {

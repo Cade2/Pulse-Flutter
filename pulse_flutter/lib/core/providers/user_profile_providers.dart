@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
+import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
@@ -38,4 +40,17 @@ final currentUserStreakProvider = Provider<PulseStreak>((ref) {
 final currentUserLevelProgressProvider = Provider<PulseLevelProgress>((ref) {
   return ref.watch(currentUserProfileProvider).asData?.value?.levelProgress ??
       const PulseLevelProgress();
+});
+
+final currentUserSettingsProvider = Provider<PulseProfileSettings>((ref) {
+  return ref.watch(currentUserProfileProvider).asData?.value?.settings ??
+      const PulseProfileSettings();
+});
+
+final currentUserAppearanceModeProvider = Provider<PulseAppearanceMode>((ref) {
+  return ref.watch(currentUserSettingsProvider).appearanceMode;
+});
+
+final currentUserThemeModeProvider = Provider<ThemeMode>((ref) {
+  return ref.watch(currentUserAppearanceModeProvider).themeMode;
 });

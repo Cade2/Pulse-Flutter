@@ -5,12 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
+import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 import 'package:pulse_flutter/features/swipe_session/models/emotion_card.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
 
 void main() {
@@ -57,6 +59,9 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           isAuthenticatedProvider.overrideWith((ref) => true),
           currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
         ],
         child: const PulseApp(),
       ),
@@ -66,7 +71,10 @@ void main() {
 
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Splash'), findsNothing);
+    expect(find.text('Pulse progress'), findsOneWidget);
     expect(find.text('Current streak'), findsOneWidget);
+    expect(find.text('Level 1'), findsOneWidget);
+    expect(find.text('0 XP total'), findsOneWidget);
     expect(find.text('0 days'), findsOneWidget);
   });
 
@@ -97,6 +105,9 @@ void main() {
               lastSessionDate: '2026-04-04',
             ),
           ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 135, currentLevel: 2),
+          ),
           currentSessionDateProvider.overrideWith(
             (ref) => DateTime(2026, 4, 4),
           ),
@@ -110,6 +121,8 @@ void main() {
 
     expect(find.text('Done for today'), findsOneWidget);
     expect(find.text('Today\'s session is complete'), findsOneWidget);
+    expect(find.text('Level 2'), findsOneWidget);
+    expect(find.text('135 XP total'), findsOneWidget);
     expect(find.text('4 days'), findsOneWidget);
     expect(find.text('Accepted emotions'), findsOneWidget);
     expect(find.text('Calm'), findsOneWidget);
@@ -142,6 +155,9 @@ void main() {
               lastSessionDate: '2026-04-04',
             ),
           ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 90, currentLevel: 1),
+          ),
           currentSessionDateProvider.overrideWith(
             (ref) => DateTime(2026, 4, 4),
           ),
@@ -171,6 +187,9 @@ void main() {
           currentUserProvider.overrideWith((ref) => null),
           isAuthenticatedProvider.overrideWith((ref) => true),
           currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
         ],
         child: const PulseApp(),
       ),
@@ -178,6 +197,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Start swipe session'));
     await tester.tap(find.text('Start swipe session'));
     await tester.pumpAndSettle();
 
@@ -210,6 +230,9 @@ void main() {
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
           currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),
@@ -220,6 +243,7 @@ void main() {
 
     expect(find.text('Start swipe session'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Start swipe session'));
     await tester.tap(find.text('Start swipe session'));
     await tester.pumpAndSettle();
 
@@ -254,12 +278,15 @@ void main() {
     expect(find.text('Cards reviewed: 8'), findsOneWidget);
     expect(find.text('Accepted: 4'), findsOneWidget);
     expect(find.text('Rejected: 4'), findsOneWidget);
+    expect(find.text('XP earned: +65 XP'), findsOneWidget);
+    expect(find.text('65 XP total'), findsOneWidget);
     expect(find.textContaining('saved to your history'), findsOneWidget);
     expect(find.textContaining('Social: Friends'), findsOneWidget);
     expect(fakeRepository.lastUid, 'test-user');
     expect(fakeRepository.lastSavedSession, isNotNull);
     expect(fakeRepository.lastSavedSession!.contextEnergy, 'Steady');
     expect(fakeRepository.lastSavedSession!.contextSleep, 'Good');
+    expect(fakeRepository.lastSaveResult?.xpEarned, 65);
   });
 
   testWidgets('history shows saved sessions in reverse chronological order', (
@@ -294,6 +321,9 @@ void main() {
               longestStreak: 5,
               lastSessionDate: '2026-04-04',
             ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 180, currentLevel: 2),
           ),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
@@ -347,6 +377,9 @@ void main() {
               lastSessionDate: '2026-04-04',
             ),
           ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 180, currentLevel: 2),
+          ),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),
@@ -387,6 +420,9 @@ void main() {
           currentUserIdProvider.overrideWith((ref) => 'test-user'),
           isAuthenticatedProvider.overrideWith((ref) => true),
           currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),
@@ -452,9 +488,11 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
   final List<SwipeSessionRecord> _sessions;
   String? lastUid;
   SwipeSessionRecord? lastSavedSession;
+  SwipeSessionSaveResult? lastSaveResult;
+  PulseLevelProgress _currentLevelProgress = const PulseLevelProgress();
 
   @override
-  Future<SwipeSessionRecord> saveSession({
+  Future<SwipeSessionSaveResult> saveSession({
     required String uid,
     required SwipeSessionSummary summary,
     String? contextSocial,
@@ -473,7 +511,18 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
       (session) => session.sessionId == lastSavedSession!.sessionId,
     );
     _sessions.add(lastSavedSession!);
-    return lastSavedSession!;
+    final int xpEarned = PulseLevelProgress.sessionXp(
+      contextSocial: contextSocial,
+      contextEnergy: contextEnergy,
+      contextSleep: contextSleep,
+    );
+    _currentLevelProgress = _currentLevelProgress.addXp(xpEarned);
+    lastSaveResult = SwipeSessionSaveResult(
+      session: lastSavedSession!,
+      xpEarned: xpEarned,
+      levelProgress: _currentLevelProgress,
+    );
+    return lastSaveResult!;
   }
 
   @override

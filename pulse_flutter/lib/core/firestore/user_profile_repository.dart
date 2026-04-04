@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 
@@ -46,6 +47,8 @@ class UserProfileRepository {
         user,
       );
       final PulseStreak streak = PulseStreak.fromFirestoreData(existingData);
+      final PulseLevelProgress levelProgress =
+          PulseLevelProgress.fromFirestoreData(existingData);
 
       final Map<String, Object?> payload = <String, Object?>{
         'uid': bootstrapProfile.uid,
@@ -58,6 +61,8 @@ class UserProfileRepository {
         'currentStreak': streak.currentStreak,
         'longestStreak': streak.longestStreak,
         'lastSessionDate': streak.lastSessionDate,
+        'totalXp': levelProgress.totalXp,
+        'currentLevel': levelProgress.currentLevel,
         'lastSeenAt': FieldValue.serverTimestamp(),
       };
 
@@ -73,19 +78,30 @@ class UserProfileRepository {
     required String uid,
     required DocumentSnapshot<Map<String, dynamic>> snapshot,
   }) async {
+    final Map<String, dynamic> data = snapshot.data() ?? <String, dynamic>{};
     final PulseUserProfile profile = PulseUserProfile.fromFirestore(snapshot);
     final PulseStreak reconciledStreak = await _resolveReconciledStreak(
       uid: uid,
       storedStreak: profile.streak,
     );
+    final PulseLevelProgress reconciledLevelProgress =
+        PulseLevelProgress.fromFirestoreData(data);
 
-    if (!profile.streak.matches(reconciledStreak)) {
-      await userDocument(
-        uid,
-      ).set(reconciledStreak.toFirestore(), SetOptions(merge: true));
+    final bool streakNeedsWriteback = !profile.streak.matches(reconciledStreak);
+    final bool levelNeedsWriteback =
+        profile.totalXp != reconciledLevelProgress.totalXp ||
+        profile.currentLevel != reconciledLevelProgress.currentLevel;
+
+    if (streakNeedsWriteback || levelNeedsWriteback) {
+      await userDocument(uid).set(<String, Object?>{
+        if (streakNeedsWriteback) ...reconciledStreak.toFirestore(),
+        if (levelNeedsWriteback) ...reconciledLevelProgress.toFirestore(),
+      }, SetOptions(merge: true));
     }
 
-    return profile.withStreak(reconciledStreak);
+    return profile
+        .withStreak(reconciledStreak)
+        .withLevelProgress(reconciledLevelProgress);
   }
 
   Future<PulseStreak> _resolveReconciledStreak({

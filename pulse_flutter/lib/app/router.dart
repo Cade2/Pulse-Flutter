@@ -7,7 +7,7 @@ import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
 import 'package:pulse_flutter/features/history/presentation/history_screen.dart';
 import 'package:pulse_flutter/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pulse_flutter/features/splash/presentation/splash_screen.dart';
-import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
 import 'package:pulse_flutter/features/swipe_session/presentation/context_tag_screen.dart';
 import 'package:pulse_flutter/features/swipe_session/presentation/swipe_completion_screen.dart';
@@ -94,9 +94,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.swipeSessionCompletePath,
         name: AppRoutes.swipeSessionCompleteName,
         builder: (context, state) {
-          final SwipeSessionRecord? session =
-              state.extra as SwipeSessionRecord?;
-          return SwipeCompletionScreen(session: session);
+          final SwipeSessionSaveResult? result =
+              state.extra as SwipeSessionSaveResult?;
+          return SwipeCompletionScreen(result: result);
         },
       ),
     ],

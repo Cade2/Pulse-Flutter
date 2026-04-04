@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
-import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
 
 class ContextTagScreen extends ConsumerStatefulWidget {
@@ -58,7 +58,7 @@ class _ContextTagScreenState extends ConsumerState<ContextTagScreen> {
     });
 
     try {
-      final SwipeSessionRecord record = await ref
+      final SwipeSessionSaveResult result = await ref
           .read(swipeSessionRepositoryProvider)
           .saveSession(
             uid: uid,
@@ -72,7 +72,7 @@ class _ContextTagScreenState extends ConsumerState<ContextTagScreen> {
         return;
       }
 
-      context.goNamed(AppRoutes.swipeSessionCompleteName, extra: record);
+      context.goNamed(AppRoutes.swipeSessionCompleteName, extra: result);
     } catch (_) {
       if (!mounted) {
         return;

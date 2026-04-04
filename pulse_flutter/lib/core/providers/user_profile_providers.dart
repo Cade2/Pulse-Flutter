@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
@@ -32,4 +33,9 @@ final currentUserStreakProvider = Provider<PulseStreak>((ref) {
           ?.streak
           .effectiveAsOf(DateTime.now()) ??
       const PulseStreak();
+});
+
+final currentUserLevelProgressProvider = Provider<PulseLevelProgress>((ref) {
+  return ref.watch(currentUserProfileProvider).asData?.value?.levelProgress ??
+      const PulseLevelProgress();
 });

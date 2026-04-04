@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
-import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
 
 class SwipeCompletionScreen extends StatelessWidget {
-  const SwipeCompletionScreen({super.key, this.session});
+  const SwipeCompletionScreen({super.key, this.result});
 
-  final SwipeSessionRecord? session;
+  final SwipeSessionSaveResult? result;
 
   @override
   Widget build(BuildContext context) {
+    final session = result?.session;
     final TextTheme textTheme = Theme.of(context).textTheme;
     final int acceptedCount = session?.acceptedCount ?? 0;
     final int rejectedCount = session?.rejectedCount ?? 0;
     final int totalCards = session?.totalCards ?? 0;
+    final int xpEarned = result?.xpEarned ?? 0;
+    final int currentLevel = result?.levelProgress.currentLevel ?? 1;
+    final int totalXp = result?.levelProgress.totalXp ?? 0;
     final String contextSummary = _buildContextSummary();
 
     return Scaffold(
@@ -37,9 +41,36 @@ class SwipeCompletionScreen extends StatelessWidget {
                   Text(
                     session == null
                         ? 'Your swipe session has ended.'
-                        : 'Session ${session!.sessionId} was saved to your history.',
+                        : 'Session ${session.sessionId} was saved to your history.',
                     style: textTheme.bodyLarge,
                     textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Text(
+                            'XP earned: +$xpEarned XP',
+                            style: textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Level $currentLevel',
+                            style: textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 12),
+                          Text('$totalXp XP total', style: textTheme.bodyLarge),
+                        ],
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 24),
                   DecoratedBox(
@@ -74,7 +105,7 @@ class SwipeCompletionScreen extends StatelessWidget {
                   if (session != null) ...[
                     const SizedBox(height: 24),
                     Text(
-                      'Accepted emotions: ${session!.acceptedEmotions.join(', ')}',
+                      'Accepted emotions: ${session.acceptedEmotions.join(', ')}',
                       style: textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),
@@ -106,14 +137,15 @@ class SwipeCompletionScreen extends StatelessWidget {
   }
 
   String _buildContextSummary() {
+    final session = result?.session;
     if (session == null) {
       return 'No context tags were saved.';
     }
 
     final List<String> parts = <String>[
-      if (session!.contextSocial != null) 'Social: ${session!.contextSocial}',
-      if (session!.contextEnergy != null) 'Energy: ${session!.contextEnergy}',
-      if (session!.contextSleep != null) 'Sleep: ${session!.contextSleep}',
+      if (session.contextSocial != null) 'Social: ${session.contextSocial}',
+      if (session.contextEnergy != null) 'Energy: ${session.contextEnergy}',
+      if (session.contextSleep != null) 'Sleep: ${session.contextSleep}',
     ];
 
     if (parts.isEmpty) {

@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
 
 abstract class SwipeSessionRepository {
-  Future<SwipeSessionRecord> saveSession({
+  Future<SwipeSessionSaveResult> saveSession({
     required String uid,
     required SwipeSessionSummary summary,
     String? contextSocial,
@@ -26,7 +28,7 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
   final FirebaseFirestore _firestore;
 
   @override
-  Future<SwipeSessionRecord> saveSession({
+  Future<SwipeSessionSaveResult> saveSession({
     required String uid,
     required SwipeSessionSummary summary,
     String? contextSocial,
@@ -50,16 +52,43 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
         .collection('sessions')
         .doc(record.sessionId);
 
-    await _firestore.runTransaction((transaction) async {
+    return _firestore.runTransaction((transaction) async {
+      final DocumentSnapshot<Map<String, dynamic>> userSnapshot =
+          await transaction.get(userDocument);
+      final DocumentSnapshot<Map<String, dynamic>> sessionSnapshot =
+          await transaction.get(sessionDocument);
+      final Map<String, dynamic> userData =
+          userSnapshot.data() ?? <String, dynamic>{};
+      final PulseLevelProgress currentProgress =
+          PulseLevelProgress.fromFirestoreData(userData);
+
+      if (sessionSnapshot.exists) {
+        return SwipeSessionSaveResult(
+          session: SwipeSessionRecord.fromFirestore(sessionSnapshot),
+          xpEarned: 0,
+          levelProgress: currentProgress,
+        );
+      }
+
+      final int xpEarned = PulseLevelProgress.sessionXp(
+        contextSocial: contextSocial,
+        contextEnergy: contextEnergy,
+        contextSleep: contextSleep,
+      );
+      final PulseLevelProgress nextProgress = currentProgress.addXp(xpEarned);
+
       transaction.set(sessionDocument, record.toFirestore());
-      transaction.set(
-        userDocument,
-        nextStreak.toFirestore(),
-        SetOptions(merge: true),
+      transaction.set(userDocument, <String, Object?>{
+        ...nextStreak.toFirestore(),
+        ...nextProgress.toFirestore(),
+      }, SetOptions(merge: true));
+
+      return SwipeSessionSaveResult(
+        session: record,
+        xpEarned: xpEarned,
+        levelProgress: nextProgress,
       );
     });
-
-    return record;
   }
 
   Future<PulseStreak> _resolveStreakAfterSave({

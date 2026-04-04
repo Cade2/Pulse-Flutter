@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
+import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -63,6 +64,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final User? currentUser = ref.watch(currentUserProvider);
     final bool isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final PulseLevelProgress levelProgress = ref.watch(
+      currentUserLevelProgressProvider,
+    );
     final int currentStreak = ref
         .watch(currentUserStreakProvider)
         .currentStreak;
@@ -120,6 +124,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   if (isAuthenticated) ...[
                     const SizedBox(height: 24),
+                    _LevelProgressCard(levelProgress: levelProgress),
+                    const SizedBox(height: 16),
                     _StreakSummaryCard(currentStreak: currentStreak),
                     const SizedBox(height: 16),
                     _TodaySessionStatusCard(
@@ -193,6 +199,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LevelProgressCard extends StatelessWidget {
+  const _LevelProgressCard({required this.levelProgress});
+
+  final PulseLevelProgress levelProgress;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextTheme textTheme = theme.textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Pulse progress', style: textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Level ${levelProgress.currentLevel}',
+              style: textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${levelProgress.totalXp} XP total',
+              style: textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: levelProgress.progressToNextLevel,
+                minHeight: 8,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '${levelProgress.xpToNextLevel} XP to Level ${levelProgress.nextLevel}',
+              style: textTheme.bodyMedium,
+            ),
+          ],
         ),
       ),
     );

@@ -3,6 +3,7 @@ export 'firestore/swipe_session_repository.dart';
 export 'firestore/user_profile_repository.dart';
 export 'models/user_profile.dart';
 export 'models/pulse_badge.dart';
+export 'models/pulse_data_export.dart';
 export 'models/pulse_insights.dart';
 export 'models/pulse_streak.dart';
 export 'models/pulse_level_progress.dart';

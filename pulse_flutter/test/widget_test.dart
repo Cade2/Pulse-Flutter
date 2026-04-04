@@ -223,6 +223,66 @@ void main() {
     expect(find.text('Ava Stone'), findsWidgets);
   });
 
+  testWidgets('profile export opens a JSON data sheet', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-21',
+              acceptedEmotions: const ['Calm', 'Joy'],
+              contextSocial: 'Friends',
+              contextEnergy: 'Steady',
+              contextSleep: 'Good',
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Profile'));
+    await tester.tap(find.text('Profile').last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Export my data'));
+    await tester.tap(find.text('Export my data'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Export your data'), findsOneWidget);
+    expect(find.text('Copy JSON'), findsOneWidget);
+    expect(find.textContaining('"profile"'), findsOneWidget);
+    expect(find.textContaining('"settings"'), findsOneWidget);
+    expect(find.textContaining('"sessions"'), findsOneWidget);
+    expect(find.textContaining('"uid": "test-user"'), findsOneWidget);
+    expect(find.textContaining('"sessionId": "2026-04-21"'), findsOneWidget);
+  });
+
   testWidgets('badge screen is reachable from profile and shows progress', (
     WidgetTester tester,
   ) async {

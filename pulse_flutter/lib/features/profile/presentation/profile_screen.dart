@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
+import 'package:pulse_flutter/core/models/pulse_data_export.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -30,6 +33,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _weeklySummaryEnabled = PulseProfileSettings.defaultWeeklySummaryEnabled;
   PulseAppearanceMode _appearanceMode =
       PulseProfileSettings.defaultAppearanceMode;
+  bool _isExporting = false;
   String? _errorMessage;
   String? _successMessage;
 
@@ -129,6 +133,88 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
       _successMessage = null;
     });
+  }
+
+  Future<void> _exportData(PulseUserProfile profile) async {
+    final String? uid = ref.read(currentUserIdProvider);
+    if (uid == null || uid.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please sign in again before exporting your data.';
+        _successMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      final sessions = await ref
+          .read(swipeSessionRepositoryProvider)
+          .watchSessions(uid: uid)
+          .first;
+      final String exportJson = PulseDataExport(
+        profile: profile,
+        sessions: sessions,
+      ).toPrettyJson();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isExporting = false;
+      });
+
+      await _showExportSheet(exportJson);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _errorMessage = 'We could not prepare your Pulse export right now.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showExportSheet(String exportJson) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) {
+        return _ExportDataSheet(
+          exportJson: exportJson,
+          onCopy: () async {
+            await Clipboard.setData(ClipboardData(text: exportJson));
+
+            if (!sheetContext.mounted) {
+              return;
+            }
+
+            Navigator.of(sheetContext).pop();
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('Pulse export copied to clipboard.'),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -411,7 +497,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                       const SizedBox(height: 32),
                       FilledButton(
-                        onPressed: _isSaving ? null : _saveProfile,
+                        onPressed: (_isSaving || _isExporting)
+                            ? null
+                            : _saveProfile,
                         child: _isSaving
                             ? const SizedBox(
                                 height: 20,
@@ -426,6 +514,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       OutlinedButton(
                         onPressed: () => context.goNamed(AppRoutes.badgesName),
                         child: const Text('View badges'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: (_isSaving || _isExporting)
+                            ? null
+                            : () => _exportData(profile),
+                        icon: _isExporting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.download_rounded),
+                        label: Text(
+                          _isExporting
+                              ? 'Preparing export...'
+                              : 'Export my data',
+                        ),
                       ),
                     ],
                   ),
@@ -510,6 +618,77 @@ class _ProfileMessageCard extends StatelessWidget {
             context,
           ).textTheme.bodyMedium?.copyWith(color: foregroundColor),
           textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportDataSheet extends StatelessWidget {
+  const _ExportDataSheet({required this.exportJson, required this.onCopy});
+
+  final String exportJson;
+  final Future<void> Function() onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return FractionallySizedBox(
+      heightFactor: 0.9,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Export your data',
+              style: textTheme.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This JSON includes your saved Pulse profile, settings, progress, badges, and sessions.',
+              style: textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: SelectableText(
+                    exportJson,
+                    style: textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(onPressed: onCopy, child: const Text('Copy JSON')),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
         ),
       ),
     );

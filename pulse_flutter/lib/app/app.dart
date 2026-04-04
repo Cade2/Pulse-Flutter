@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/app/theme.dart';
-import 'package:pulse_flutter/core/models/user_profile.dart';
+import 'package:pulse_flutter/core/notifications/pulse_local_notification_service.dart';
 import 'package:pulse_flutter/core/providers/notification_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
@@ -16,30 +16,22 @@ class PulseApp extends ConsumerStatefulWidget {
 }
 
 class _PulseAppState extends ConsumerState<PulseApp> {
-  late final ProviderSubscription<AsyncValue<PulseUserProfile?>>
-  _profileSubscription;
+  late final ProviderSubscription<PulseReminderSyncState?>
+  _reminderSubscription;
 
   @override
   void initState() {
     super.initState();
-    _profileSubscription = ref.listenManual<AsyncValue<PulseUserProfile?>>(
-      currentUserProfileProvider,
+    _reminderSubscription = ref.listenManual<PulseReminderSyncState?>(
+      pulseReminderSyncStateProvider,
       (previous, next) {
-        final PulseUserProfile? previousProfile = previous?.asData?.value;
-        final PulseUserProfile? nextProfile = next.asData?.value;
-        final bool previousWasData = previous?.hasValue ?? false;
-
-        if (previousWasData &&
-            next.hasValue &&
-            _hasSameReminderSettings(previousProfile, nextProfile)) {
+        if (next == null || previous == next) {
           return;
         }
 
-        next.whenData((profile) {
-          unawaited(
-            ref.read(pulseReminderSyncControllerProvider).syncProfile(profile),
-          );
-        });
+        unawaited(
+          ref.read(pulseReminderSyncControllerProvider).syncState(next),
+        );
       },
       fireImmediately: true,
     );
@@ -47,23 +39,8 @@ class _PulseAppState extends ConsumerState<PulseApp> {
 
   @override
   void dispose() {
-    _profileSubscription.close();
+    _reminderSubscription.close();
     super.dispose();
-  }
-
-  bool _hasSameReminderSettings(
-    PulseUserProfile? previousProfile,
-    PulseUserProfile? nextProfile,
-  ) {
-    if (previousProfile == null || nextProfile == null) {
-      return previousProfile == nextProfile;
-    }
-
-    return previousProfile.uid == nextProfile.uid &&
-        previousProfile.settings.preferredReminderTime ==
-            nextProfile.settings.preferredReminderTime &&
-        previousProfile.settings.dailyRemindersEnabled ==
-            nextProfile.settings.dailyRemindersEnabled;
   }
 
   @override

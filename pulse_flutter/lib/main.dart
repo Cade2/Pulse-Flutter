@@ -15,9 +15,7 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [
-        pulseDailyReminderServiceProvider.overrideWithValue(
-          notificationService,
-        ),
+        pulseReminderServiceProvider.overrideWithValue(notificationService),
       ],
       child: const PulseApp(),
     ),

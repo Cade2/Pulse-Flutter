@@ -196,6 +196,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: isAuthenticated
+                        ? () => context.goNamed(AppRoutes.insightsName)
+                        : null,
+                    child: const Text('Insights'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: isAuthenticated
                         ? () => context.goNamed(AppRoutes.profileName)
                         : null,
                     child: const Text('Profile'),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
+import 'package:pulse_flutter/core/models/pulse_insights.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
@@ -193,6 +194,148 @@ void main() {
     expect(find.text('1 / 7 sessions'), findsOneWidget);
     expect(find.text('Level 1 / 2'), findsOneWidget);
     expect(find.text('Unlocked'), findsNWidgets(2));
+  });
+
+  testWidgets('insights screen shows locked progress before five sessions', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-01',
+              acceptedEmotions: const ['Calm'],
+            ),
+            _buildSessionRecord(
+              date: '2026-04-02',
+              acceptedEmotions: const ['Calm', 'Joy'],
+            ),
+            _buildSessionRecord(
+              date: '2026-04-03',
+              acceptedEmotions: const ['Hope'],
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Insights'));
+    await tester.tap(find.text('Insights').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Insights are locked'), findsOneWidget);
+    expect(find.text('3 / 5 sessions'), findsOneWidget);
+    expect(
+      find.text('Save 2 more sessions to unlock your first Pulse insights.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('insights screen shows expanded patterns from saved history', (
+    WidgetTester tester,
+  ) async {
+    final List<SwipeSessionRecord> sessions = <SwipeSessionRecord>[
+      for (int index = 1; index <= 9; index++)
+        _buildSessionRecord(
+          date: '2026-04-${index.toString().padLeft(2, '0')}',
+          acceptedEmotions: const ['Calm', 'Joy'],
+          contextSocial: 'Friends',
+          contextEnergy: 'Steady',
+          contextSleep: 'Good',
+        ),
+      for (int index = 10; index <= 14; index++)
+        _buildSessionRecord(
+          date: '2026-04-${index.toString().padLeft(2, '0')}',
+          acceptedEmotions: const ['Calm'],
+          contextSocial: 'Solo',
+          contextEnergy: 'High',
+          contextSleep: 'Late',
+        ),
+    ];
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(sessions: sessions);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 5,
+              longestStreak: 9,
+              lastSessionDate: '2026-04-14',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 200, currentLevel: 3),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Insights'));
+    await tester.tap(find.text('Insights').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('Top accepted emotions'), findsOneWidget);
+    expect(find.text('Most common context tags'), findsOneWidget);
+    expect(find.text('Pattern signals'), findsOneWidget);
+    expect(find.text('14 sessions saved'), findsOneWidget);
+    expect(find.text('Calm'), findsWidgets);
+    expect(find.text('Social: Friends'), findsOneWidget);
+    expect(find.text('Most common social context'), findsOneWidget);
+    expect(find.text('Friends'), findsOneWidget);
+    expect(find.text('Steady'), findsOneWidget);
+    expect(find.text('Good'), findsOneWidget);
+    expect(
+      find.text(
+        _formatInsightAverage(
+          23 / PulseInsightsReport.expandedUnlockSessionCount,
+        ),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('home shows done-for-today state when today already exists', (
@@ -743,4 +886,9 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
 
     return Stream<List<SwipeSessionRecord>>.value(sorted);
   }
+}
+
+String _formatInsightAverage(double value) {
+  final bool isWholeNumber = value == value.roundToDouble();
+  return isWholeNumber ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
 }

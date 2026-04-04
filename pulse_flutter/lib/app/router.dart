@@ -6,6 +6,7 @@ import 'package:pulse_flutter/features/auth/presentation/login_screen.dart';
 import 'package:pulse_flutter/features/badges/presentation/badges_screen.dart';
 import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
 import 'package:pulse_flutter/features/history/presentation/history_screen.dart';
+import 'package:pulse_flutter/features/insights/presentation/insights_screen.dart';
 import 'package:pulse_flutter/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pulse_flutter/features/profile/presentation/profile_screen.dart';
 import 'package:pulse_flutter/features/splash/presentation/splash_screen.dart';
@@ -36,6 +37,9 @@ abstract final class AppRoutes {
 
   static const String badgesName = 'badges';
   static const String badgesPath = '/badges';
+
+  static const String insightsName = 'insights';
+  static const String insightsPath = '/insights';
 
   static const String swipeSessionName = 'swipe-session';
   static const String swipeSessionPath = '/session';
@@ -93,6 +97,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.badgesPath,
         name: AppRoutes.badgesName,
         builder: (context, state) => const BadgesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.insightsPath,
+        name: AppRoutes.insightsName,
+        builder: (context, state) => const InsightsScreen(),
       ),
       GoRoute(
         path: AppRoutes.swipeSessionPath,

@@ -10,6 +10,8 @@ abstract class SwipeSessionRepository {
     String? contextEnergy,
     String? contextSleep,
   });
+
+  Stream<List<SwipeSessionRecord>> watchSessions({required String uid});
 }
 
 class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
@@ -40,5 +42,20 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
         .set(record.toFirestore());
 
     return record;
+  }
+
+  @override
+  Stream<List<SwipeSessionRecord>> watchSessions({required String uid}) {
+    return _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .orderBy('completedAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map(SwipeSessionRecord.fromFirestore)
+              .toList(growable: false);
+        });
   }
 }

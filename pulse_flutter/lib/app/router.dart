@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/features/auth/presentation/login_screen.dart';
 import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
+import 'package:pulse_flutter/features/history/presentation/history_screen.dart';
 import 'package:pulse_flutter/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pulse_flutter/features/splash/presentation/splash_screen.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
@@ -23,6 +24,9 @@ abstract final class AppRoutes {
 
   static const String homeName = 'home';
   static const String homePath = '/home';
+
+  static const String historyName = 'history';
+  static const String historyPath = '/history';
 
   static const String swipeSessionName = 'swipe-session';
   static const String swipeSessionPath = '/session';
@@ -64,6 +68,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.homePath,
         name: AppRoutes.homeName,
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.historyPath,
+        name: AppRoutes.historyName,
+        builder: (context, state) => const HistoryScreen(),
       ),
       GoRoute(
         path: AppRoutes.swipeSessionPath,

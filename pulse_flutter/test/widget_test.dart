@@ -7,6 +7,7 @@ import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
+import 'package:pulse_flutter/features/swipe_session/models/emotion_card.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_summary.dart';
 
@@ -127,9 +128,129 @@ void main() {
     expect(fakeRepository.lastSavedSession!.contextEnergy, 'Steady');
     expect(fakeRepository.lastSavedSession!.contextSleep, 'Good');
   });
+
+  testWidgets('history shows saved sessions in reverse chronological order', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-02',
+              acceptedEmotions: const ['Calm', 'Joy'],
+              contextSocial: 'Friends',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-04',
+              acceptedEmotions: const ['Focus', 'Hope', 'Confidence'],
+              contextEnergy: 'High',
+              contextSleep: 'Good',
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('View history'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('History'), findsOneWidget);
+    expect(find.text('2026-04-04'), findsOneWidget);
+    expect(find.text('2026-04-02'), findsOneWidget);
+    expect(find.text('Accepted 3 of 8 emotions'), findsOneWidget);
+    expect(find.textContaining('Energy: High | Sleep: Good'), findsOneWidget);
+
+    final Finder latest = find.text('2026-04-04');
+    final Finder older = find.text('2026-04-02');
+    expect(tester.getTopLeft(latest).dy, lessThan(tester.getTopLeft(older).dy));
+  });
+
+  testWidgets('history shows an empty state when no sessions exist', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('View history'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No sessions yet'), findsOneWidget);
+    expect(
+      find.textContaining('Complete your first swipe session'),
+      findsOneWidget,
+    );
+  });
+}
+
+SwipeSessionRecord _buildSessionRecord({
+  required String date,
+  required List<String> acceptedEmotions,
+  String? contextSocial,
+  String? contextEnergy,
+  String? contextSleep,
+}) {
+  return SwipeSessionRecord.fromSummary(
+    summary: SwipeSessionSummary(
+      responses: List<EmotionCardResponse>.generate(8, (index) {
+        final bool accepted = index < acceptedEmotions.length;
+        final String title = accepted
+            ? acceptedEmotions[index]
+            : 'Emotion $index';
+
+        return EmotionCardResponse(
+          card: EmotionCard(
+            id: 'emotion-$index',
+            title: title,
+            headline: title,
+            description: '',
+            reflectionPrompt: '',
+            accentColor: const Color(0xFF2ED3E6),
+          ),
+          decision: accepted
+              ? EmotionCardDecision.accept
+              : EmotionCardDecision.reject,
+        );
+      }),
+    ),
+    contextSocial: contextSocial,
+    contextEnergy: contextEnergy,
+    contextSleep: contextSleep,
+    completedAt: DateTime.parse('$date 12:00:00'),
+  );
 }
 
 class _FakeSwipeSessionRepository implements SwipeSessionRepository {
+  _FakeSwipeSessionRepository({
+    List<SwipeSessionRecord> sessions = const <SwipeSessionRecord>[],
+  }) : _sessions = List<SwipeSessionRecord>.from(sessions);
+
+  final List<SwipeSessionRecord> _sessions;
   String? lastUid;
   SwipeSessionRecord? lastSavedSession;
 
@@ -149,6 +270,19 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
       contextSleep: contextSleep,
       completedAt: DateTime(2026, 4, 4, 12),
     );
+    _sessions.removeWhere(
+      (session) => session.sessionId == lastSavedSession!.sessionId,
+    );
+    _sessions.add(lastSavedSession!);
     return lastSavedSession!;
+  }
+
+  @override
+  Stream<List<SwipeSessionRecord>> watchSessions({required String uid}) {
+    final List<SwipeSessionRecord> sorted = List<SwipeSessionRecord>.from(
+      _sessions,
+    )..sort((a, b) => b.completedAt.compareTo(a.completedAt));
+
+    return Stream<List<SwipeSessionRecord>>.value(sorted);
   }
 }

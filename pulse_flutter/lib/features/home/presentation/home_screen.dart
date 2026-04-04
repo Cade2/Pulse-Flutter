@@ -123,6 +123,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: const Text('Start swipe session'),
                   ),
                   const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: isAuthenticated
+                        ? () => context.goNamed(AppRoutes.historyName)
+                        : null,
+                    child: const Text('View history'),
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: _isSigningOut || !isAuthenticated
                         ? null

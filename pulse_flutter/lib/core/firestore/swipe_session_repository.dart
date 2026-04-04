@@ -39,6 +39,10 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
       contextEnergy: contextEnergy,
       contextSleep: contextSleep,
     );
+    final PulseStreak nextStreak = await _resolveStreakAfterSave(
+      uid: uid,
+      sessionDate: record.sessionId,
+    );
     final DocumentReference<Map<String, dynamic>> userDocument = _firestore
         .collection('users')
         .doc(uid);
@@ -47,14 +51,6 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
         .doc(record.sessionId);
 
     await _firestore.runTransaction((transaction) async {
-      final DocumentSnapshot<Map<String, dynamic>> userSnapshot =
-          await transaction.get(userDocument);
-      final Map<String, dynamic> userData =
-          userSnapshot.data() ?? <String, dynamic>{};
-      final PulseStreak nextStreak = PulseStreak.fromFirestoreData(
-        userData,
-      ).recordCompletion(record.sessionId);
-
       transaction.set(sessionDocument, record.toFirestore());
       transaction.set(
         userDocument,
@@ -64,6 +60,35 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
     });
 
     return record;
+  }
+
+  Future<PulseStreak> _resolveStreakAfterSave({
+    required String uid,
+    required String sessionDate,
+  }) async {
+    final QuerySnapshot<Map<String, dynamic>> sessionsSnapshot =
+        await _firestore
+            .collection('users')
+            .doc(uid)
+            .collection('sessions')
+            .get();
+    final Set<String> sessionDates = sessionsSnapshot.docs.map((snapshot) {
+      final Map<String, dynamic> data = snapshot.data();
+      final Object? dateValue = data['date'];
+
+      if (dateValue is String && dateValue.trim().isNotEmpty) {
+        return dateValue.trim();
+      }
+
+      return snapshot.id;
+    }).toSet();
+
+    sessionDates.add(sessionDate);
+
+    return PulseStreak.fromSessionDates(
+      sessionDates,
+      currentDate: DateTime.now(),
+    );
   }
 
   @override

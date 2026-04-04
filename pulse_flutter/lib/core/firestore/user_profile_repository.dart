@@ -22,16 +22,16 @@ class UserProfileRepository {
       return null;
     }
 
-    return PulseUserProfile.fromFirestore(snapshot);
+    return _buildReconciledProfile(uid: uid, snapshot: snapshot);
   }
 
   Stream<PulseUserProfile?> watchUserProfile(String uid) {
-    return userDocument(uid).snapshots().map((snapshot) {
+    return userDocument(uid).snapshots().asyncMap((snapshot) async {
       if (!snapshot.exists) {
         return null;
       }
 
-      return PulseUserProfile.fromFirestore(snapshot);
+      return _buildReconciledProfile(uid: uid, snapshot: snapshot);
     });
   }
 
@@ -67,6 +67,46 @@ class UserProfileRepository {
 
       transaction.set(docRef, payload, SetOptions(merge: true));
     });
+  }
+
+  Future<PulseUserProfile> _buildReconciledProfile({
+    required String uid,
+    required DocumentSnapshot<Map<String, dynamic>> snapshot,
+  }) async {
+    final PulseUserProfile profile = PulseUserProfile.fromFirestore(snapshot);
+    final PulseStreak reconciledStreak = await _resolveReconciledStreak(
+      uid: uid,
+      storedStreak: profile.streak,
+    );
+
+    if (!profile.streak.matches(reconciledStreak)) {
+      await userDocument(
+        uid,
+      ).set(reconciledStreak.toFirestore(), SetOptions(merge: true));
+    }
+
+    return profile.withStreak(reconciledStreak);
+  }
+
+  Future<PulseStreak> _resolveReconciledStreak({
+    required String uid,
+    required PulseStreak storedStreak,
+  }) async {
+    final QuerySnapshot<Map<String, dynamic>> sessionsSnapshot =
+        await userDocument(uid).collection('sessions').get();
+    final DateTime now = DateTime.now();
+
+    if (sessionsSnapshot.docs.isEmpty) {
+      return storedStreak.effectiveAsOf(now);
+    }
+
+    final Iterable<String> sessionDates = sessionsSnapshot.docs.map((snapshot) {
+      final Map<String, dynamic> data = snapshot.data();
+      final String? date = _trimToNull(data['date']);
+      return date ?? snapshot.id;
+    });
+
+    return PulseStreak.fromSessionDates(sessionDates, currentDate: now);
   }
 
   String? _resolveDisplayName(Object? existingValue, String? fallbackValue) {

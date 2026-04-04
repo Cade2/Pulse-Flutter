@@ -35,6 +35,20 @@ class PulseUserProfile {
     );
   }
 
+  PulseUserProfile withStreak(PulseStreak streak) {
+    return PulseUserProfile(
+      uid: uid,
+      email: email,
+      displayName: displayName,
+      avatarColour: avatarColour,
+      currentStreak: streak.currentStreak,
+      longestStreak: streak.longestStreak,
+      lastSessionDate: streak.lastSessionDate,
+      createdAt: createdAt,
+      lastSeenAt: lastSeenAt,
+    );
+  }
+
   factory PulseUserProfile.fromAuthUser(User user) {
     return PulseUserProfile(
       uid: user.uid,

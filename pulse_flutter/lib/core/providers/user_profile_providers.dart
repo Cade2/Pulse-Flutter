@@ -25,6 +25,11 @@ final currentUserProfileProvider = StreamProvider<PulseUserProfile?>((ref) {
 });
 
 final currentUserStreakProvider = Provider<PulseStreak>((ref) {
-  return ref.watch(currentUserProfileProvider).asData?.value?.streak ??
+  return ref
+          .watch(currentUserProfileProvider)
+          .asData
+          ?.value
+          ?.streak
+          .effectiveAsOf(DateTime.now()) ??
       const PulseStreak();
 });

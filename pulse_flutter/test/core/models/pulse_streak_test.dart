@@ -43,4 +43,44 @@ void main() {
     expect(updated.longestStreak, 6);
     expect(updated.lastSessionDate, '2026-04-04');
   });
+
+  test('fromSessionDates rebuilds current and longest streak values', () {
+    final PulseStreak rebuilt = PulseStreak.fromSessionDates(const <String>[
+      '2026-04-01',
+      '2026-04-02',
+      '2026-04-04',
+      '2026-04-05',
+      '2026-04-06',
+    ], currentDate: DateTime(2026, 4, 6));
+
+    expect(rebuilt.currentStreak, 3);
+    expect(rebuilt.longestStreak, 3);
+    expect(rebuilt.lastSessionDate, '2026-04-06');
+  });
+
+  test('fromSessionDates resets current streak after missed days', () {
+    final PulseStreak rebuilt = PulseStreak.fromSessionDates(const <String>[
+      '2026-04-01',
+      '2026-04-02',
+      '2026-04-03',
+    ], currentDate: DateTime(2026, 4, 6));
+
+    expect(rebuilt.currentStreak, 0);
+    expect(rebuilt.longestStreak, 3);
+    expect(rebuilt.lastSessionDate, '2026-04-03');
+  });
+
+  test('effectiveAsOf zeroes stale current streak while keeping longest', () {
+    const PulseStreak streak = PulseStreak(
+      currentStreak: 5,
+      longestStreak: 7,
+      lastSessionDate: '2026-04-02',
+    );
+
+    final PulseStreak effective = streak.effectiveAsOf(DateTime(2026, 4, 5));
+
+    expect(effective.currentStreak, 0);
+    expect(effective.longestStreak, 7);
+    expect(effective.lastSessionDate, '2026-04-02');
+  });
 }

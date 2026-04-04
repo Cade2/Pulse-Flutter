@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
+import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 
@@ -80,12 +81,17 @@ class UserProfileRepository {
   }) async {
     final Map<String, dynamic> data = snapshot.data() ?? <String, dynamic>{};
     final PulseUserProfile profile = PulseUserProfile.fromFirestore(snapshot);
-    final PulseStreak reconciledStreak = await _resolveReconciledStreak(
-      uid: uid,
+    final List<PulseSessionHistoryEntry> sessionHistory =
+        await _readSessionHistory(uid);
+    final PulseStreak reconciledStreak = _resolveReconciledStreak(
       storedStreak: profile.streak,
+      sessionHistory: sessionHistory,
     );
     final PulseLevelProgress reconciledLevelProgress =
-        PulseLevelProgress.fromFirestoreData(data);
+        _resolveReconciledLevelProgress(
+          storedLevelProgress: PulseLevelProgress.fromFirestoreData(data),
+          sessionHistory: sessionHistory,
+        );
 
     final bool streakNeedsWriteback = !profile.streak.matches(reconciledStreak);
     final bool levelNeedsWriteback =
@@ -104,25 +110,47 @@ class UserProfileRepository {
         .withLevelProgress(reconciledLevelProgress);
   }
 
-  Future<PulseStreak> _resolveReconciledStreak({
-    required String uid,
-    required PulseStreak storedStreak,
-  }) async {
+  Future<List<PulseSessionHistoryEntry>> _readSessionHistory(String uid) async {
     final QuerySnapshot<Map<String, dynamic>> sessionsSnapshot =
         await userDocument(uid).collection('sessions').get();
+
+    return sessionsSnapshot.docs
+        .map((snapshot) {
+          return PulseSessionHistoryEntry.fromFirestoreData(
+            data: snapshot.data(),
+            fallbackDate: snapshot.id,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  PulseStreak _resolveReconciledStreak({
+    required PulseStreak storedStreak,
+    required List<PulseSessionHistoryEntry> sessionHistory,
+  }) {
     final DateTime now = DateTime.now();
 
-    if (sessionsSnapshot.docs.isEmpty) {
+    if (sessionHistory.isEmpty) {
       return storedStreak.effectiveAsOf(now);
     }
 
-    final Iterable<String> sessionDates = sessionsSnapshot.docs.map((snapshot) {
-      final Map<String, dynamic> data = snapshot.data();
-      final String? date = _trimToNull(data['date']);
-      return date ?? snapshot.id;
-    });
+    return PulseStreak.fromSessionDates(
+      sessionHistory.map((session) => session.date),
+      currentDate: now,
+    );
+  }
 
-    return PulseStreak.fromSessionDates(sessionDates, currentDate: now);
+  PulseLevelProgress _resolveReconciledLevelProgress({
+    required PulseLevelProgress storedLevelProgress,
+    required List<PulseSessionHistoryEntry> sessionHistory,
+  }) {
+    if (sessionHistory.isEmpty) {
+      return storedLevelProgress;
+    }
+
+    return PulseLevelProgress.fromSessionXpAwards(
+      sessionHistory.map((session) => session.earnedXp),
+    );
   }
 
   String? _resolveDisplayName(Object? existingValue, String? fallbackValue) {

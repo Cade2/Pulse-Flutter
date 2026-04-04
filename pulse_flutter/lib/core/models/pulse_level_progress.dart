@@ -21,6 +21,18 @@ class PulseLevelProgress {
     );
   }
 
+  static PulseLevelProgress fromSessionXpAwards(Iterable<int> xpAwards) {
+    int totalXp = 0;
+
+    for (final int award in xpAwards) {
+      if (award > 0) {
+        totalXp += award;
+      }
+    }
+
+    return PulseLevelProgress.fromTotalXp(totalXp);
+  }
+
   int get levelFloorXp => (currentLevel - 1) * xpPerLevel;
 
   int get xpIntoLevel => totalXp - levelFloorXp;

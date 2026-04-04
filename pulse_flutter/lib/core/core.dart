@@ -4,6 +4,7 @@ export 'firestore/user_profile_repository.dart';
 export 'models/user_profile.dart';
 export 'models/pulse_streak.dart';
 export 'models/pulse_level_progress.dart';
+export 'models/pulse_session_history_entry.dart';
 export 'providers/auth_providers.dart';
 export 'providers/swipe_session_providers.dart';
 export 'providers/user_profile_providers.dart';

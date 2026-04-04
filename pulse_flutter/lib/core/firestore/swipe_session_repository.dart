@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
+import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
@@ -41,41 +42,58 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
       contextEnergy: contextEnergy,
       contextSleep: contextSleep,
     );
-    final PulseStreak nextStreak = await _resolveStreakAfterSave(
-      uid: uid,
-      sessionDate: record.sessionId,
+    final List<PulseSessionHistoryEntry> sessionHistory =
+        await _readSessionHistory(uid);
+    final PulseSessionHistoryEntry pendingSession = PulseSessionHistoryEntry(
+      date: record.sessionId,
+      contextSocial: contextSocial,
+      contextEnergy: contextEnergy,
+      contextSleep: contextSleep,
     );
-    final DocumentReference<Map<String, dynamic>> userDocument = _firestore
-        .collection('users')
-        .doc(uid);
-    final DocumentReference<Map<String, dynamic>> sessionDocument = userDocument
-        .collection('sessions')
-        .doc(record.sessionId);
+    final List<PulseSessionHistoryEntry> pendingHistory = _upsertSessionHistory(
+      sessionHistory,
+      pendingSession,
+    );
+    final PulseStreak nextStreak = _resolveStreakFromHistory(pendingHistory);
+    final PulseLevelProgress nextProgress = _resolveLevelProgressFromHistory(
+      pendingHistory,
+    );
+    final int xpEarned = pendingSession.earnedXp;
 
     return _firestore.runTransaction((transaction) async {
-      final DocumentSnapshot<Map<String, dynamic>> userSnapshot =
-          await transaction.get(userDocument);
+      final DocumentReference<Map<String, dynamic>> userDocument = _firestore
+          .collection('users')
+          .doc(uid);
+      final DocumentReference<Map<String, dynamic>> sessionDocument =
+          userDocument.collection('sessions').doc(record.sessionId);
       final DocumentSnapshot<Map<String, dynamic>> sessionSnapshot =
           await transaction.get(sessionDocument);
-      final Map<String, dynamic> userData =
-          userSnapshot.data() ?? <String, dynamic>{};
-      final PulseLevelProgress currentProgress =
-          PulseLevelProgress.fromFirestoreData(userData);
 
       if (sessionSnapshot.exists) {
+        final PulseSessionHistoryEntry existingSession =
+            PulseSessionHistoryEntry.fromFirestoreData(
+              data: sessionSnapshot.data() ?? <String, dynamic>{},
+              fallbackDate: sessionSnapshot.id,
+            );
+        final List<PulseSessionHistoryEntry> existingHistory =
+            _upsertSessionHistory(sessionHistory, existingSession);
+        final PulseLevelProgress existingProgress =
+            _resolveLevelProgressFromHistory(existingHistory);
+        final PulseStreak existingStreak = _resolveStreakFromHistory(
+          existingHistory,
+        );
+
+        transaction.set(userDocument, <String, Object?>{
+          ...existingStreak.toFirestore(),
+          ...existingProgress.toFirestore(),
+        }, SetOptions(merge: true));
+
         return SwipeSessionSaveResult(
           session: SwipeSessionRecord.fromFirestore(sessionSnapshot),
           xpEarned: 0,
-          levelProgress: currentProgress,
+          levelProgress: existingProgress,
         );
       }
-
-      final int xpEarned = PulseLevelProgress.sessionXp(
-        contextSocial: contextSocial,
-        contextEnergy: contextEnergy,
-        contextSleep: contextSleep,
-      );
-      final PulseLevelProgress nextProgress = currentProgress.addXp(xpEarned);
 
       transaction.set(sessionDocument, record.toFirestore());
       transaction.set(userDocument, <String, Object?>{
@@ -91,32 +109,57 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
     });
   }
 
-  Future<PulseStreak> _resolveStreakAfterSave({
-    required String uid,
-    required String sessionDate,
-  }) async {
+  Future<List<PulseSessionHistoryEntry>> _readSessionHistory(String uid) async {
     final QuerySnapshot<Map<String, dynamic>> sessionsSnapshot =
         await _firestore
             .collection('users')
             .doc(uid)
             .collection('sessions')
             .get();
-    final Set<String> sessionDates = sessionsSnapshot.docs.map((snapshot) {
-      final Map<String, dynamic> data = snapshot.data();
-      final Object? dateValue = data['date'];
 
-      if (dateValue is String && dateValue.trim().isNotEmpty) {
-        return dateValue.trim();
-      }
+    return sessionsSnapshot.docs
+        .map((snapshot) {
+          return PulseSessionHistoryEntry.fromFirestoreData(
+            data: snapshot.data(),
+            fallbackDate: snapshot.id,
+          );
+        })
+        .toList(growable: false);
+  }
 
-      return snapshot.id;
-    }).toSet();
+  List<PulseSessionHistoryEntry> _upsertSessionHistory(
+    List<PulseSessionHistoryEntry> sessionHistory,
+    PulseSessionHistoryEntry session,
+  ) {
+    final List<PulseSessionHistoryEntry> updatedHistory = sessionHistory
+        .where((entry) => entry.date != session.date)
+        .toList(growable: true);
+    updatedHistory.add(session);
+    return updatedHistory;
+  }
 
-    sessionDates.add(sessionDate);
+  PulseStreak _resolveStreakFromHistory(
+    List<PulseSessionHistoryEntry> sessionHistory,
+  ) {
+    if (sessionHistory.isEmpty) {
+      return const PulseStreak();
+    }
 
     return PulseStreak.fromSessionDates(
-      sessionDates,
+      sessionHistory.map((session) => session.date),
       currentDate: DateTime.now(),
+    );
+  }
+
+  PulseLevelProgress _resolveLevelProgressFromHistory(
+    List<PulseSessionHistoryEntry> sessionHistory,
+  ) {
+    if (sessionHistory.isEmpty) {
+      return const PulseLevelProgress();
+    }
+
+    return PulseLevelProgress.fromSessionXpAwards(
+      sessionHistory.map((session) => session.earnedXp),
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/features/auth/presentation/login_screen.dart';
 import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
 import 'package:pulse_flutter/features/history/presentation/history_screen.dart';
@@ -40,6 +41,7 @@ abstract final class AppRoutes {
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final bool isAuthenticated = ref.watch(isAuthenticatedProvider);
+  final bool hasCompletedToday = ref.watch(hasCompletedTodayProvider);
   const Set<String> publicPaths = <String>{
     AppRoutes.splashPath,
     AppRoutes.onboardingPath,
@@ -106,6 +108,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (isAuthenticated && publicPaths.contains(location)) {
+        return AppRoutes.homePath;
+      }
+
+      if (isAuthenticated &&
+          hasCompletedToday &&
+          location == AppRoutes.swipeSessionPath) {
         return AppRoutes.homePath;
       }
 

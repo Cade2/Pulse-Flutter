@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
+import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -60,7 +62,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final User? currentUser = ref.watch(currentUserProvider);
     final bool isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final AsyncValue<SwipeSessionRecord?> todaySessionAsync = ref.watch(
+      todaySwipeSessionProvider,
+    );
+    final SwipeSessionRecord? todaySession = todaySessionAsync.asData?.value;
     final String? email = currentUser?.email?.trim();
+    final bool isCheckingToday =
+        isAuthenticated &&
+        todaySessionAsync.isLoading &&
+        !todaySessionAsync.hasValue;
+    final bool hasTodaySession = todaySession != null;
+    final bool hasTodaySessionError =
+        isAuthenticated &&
+        todaySessionAsync.hasError &&
+        !todaySessionAsync.hasValue;
+    final bool canStartSession =
+        isAuthenticated &&
+        !isCheckingToday &&
+        !hasTodaySession &&
+        !hasTodaySessionError;
 
     final String authMessage;
     if (!isAuthenticated) {
@@ -74,13 +94,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Pulse')),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
@@ -94,6 +114,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     style: textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),
+                  if (isAuthenticated) ...[
+                    const SizedBox(height: 24),
+                    _TodaySessionStatusCard(
+                      todaySessionAsync: todaySessionAsync,
+                    ),
+                  ],
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 16),
                     DecoratedBox(
@@ -117,10 +143,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                   const SizedBox(height: 32),
                   FilledButton(
-                    onPressed: isAuthenticated
+                    onPressed: canStartSession
                         ? () => context.goNamed(AppRoutes.swipeSessionName)
                         : null,
-                    child: const Text('Start swipe session'),
+                    child: Text(
+                      hasTodaySession
+                          ? 'Today\'s session is complete'
+                          : isCheckingToday
+                          ? 'Checking today...'
+                          : hasTodaySessionError
+                          ? 'Session unavailable'
+                          : 'Start swipe session',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
@@ -153,6 +187,102 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TodaySessionStatusCard extends StatelessWidget {
+  const _TodaySessionStatusCard({required this.todaySessionAsync});
+
+  final AsyncValue<SwipeSessionRecord?> todaySessionAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextTheme textTheme = theme.textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: todaySessionAsync.when(
+          data: (session) {
+            if (session == null) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Ready for today', style: textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your next Pulse session is available whenever you are.',
+                    style: textTheme.bodyMedium,
+                  ),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Done for today', style: textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(
+                  'Today\'s Pulse session is complete. Come back tomorrow for your next check-in.',
+                  style: textTheme.bodyMedium,
+                ),
+                if (session.acceptedEmotions.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text('Accepted emotions', style: textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: session.acceptedEmotions
+                        .map((emotion) {
+                          return Chip(label: Text(emotion));
+                        })
+                        .toList(growable: false),
+                  ),
+                ],
+              ],
+            );
+          },
+          loading: () {
+            return Row(
+              children: [
+                const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Checking today\'s session availability...',
+                    style: textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            );
+          },
+          error: (error, stackTrace) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Unable to check today', style: textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(
+                  'Please try again in a moment before starting a new session.',
+                  style: textTheme.bodyMedium,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

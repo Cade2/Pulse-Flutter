@@ -65,6 +65,83 @@ void main() {
     expect(find.text('Splash'), findsNothing);
   });
 
+  testWidgets('home shows done-for-today state when today already exists', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-04',
+              acceptedEmotions: const ['Calm', 'Joy'],
+              contextEnergy: 'Steady',
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 4),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Done for today'), findsOneWidget);
+    expect(find.text('Today\'s session is complete'), findsOneWidget);
+    expect(find.text('Accepted emotions'), findsOneWidget);
+    expect(find.text('Calm'), findsOneWidget);
+    expect(find.text('Joy'), findsOneWidget);
+  });
+
+  testWidgets('users cannot open another session after finishing today', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-04',
+              acceptedEmotions: const ['Focus', 'Hope'],
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 4),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final BuildContext context = tester.element(find.text('Home'));
+    GoRouter.of(context).go(AppRoutes.swipeSessionPath);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Done for today'), findsOneWidget);
+    expect(find.text('Card 1 of 8'), findsNothing);
+  });
+
   testWidgets('swiping right accepts and swiping left rejects a card', (
     WidgetTester tester,
   ) async {
@@ -197,6 +274,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('View history'));
     await tester.tap(find.text('View history'));
     await tester.pumpAndSettle();
 
@@ -241,6 +319,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('View history'));
     await tester.tap(find.text('View history'));
     await tester.pumpAndSettle();
 
@@ -279,6 +358,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('View history'));
     await tester.tap(find.text('View history'));
     await tester.pumpAndSettle();
 
@@ -357,6 +437,23 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
     );
     _sessions.add(lastSavedSession!);
     return lastSavedSession!;
+  }
+
+  @override
+  Stream<SwipeSessionRecord?> watchSession({
+    required String uid,
+    required String sessionId,
+  }) {
+    SwipeSessionRecord? matchingSession;
+
+    for (final SwipeSessionRecord session in _sessions) {
+      if (session.sessionId == sessionId) {
+        matchingSession = session;
+        break;
+      }
+    }
+
+    return Stream<SwipeSessionRecord?>.value(matchingSession);
   }
 
   @override

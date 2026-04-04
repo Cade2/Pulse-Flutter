@@ -34,7 +34,7 @@ class SwipeSessionRecord {
     DateTime? completedAt,
   }) {
     final DateTime timestamp = completedAt ?? DateTime.now();
-    final String date = _formatDate(timestamp);
+    final String date = sessionIdForDate(timestamp);
 
     return SwipeSessionRecord(
       sessionId: date,
@@ -104,6 +104,10 @@ class SwipeSessionRecord {
       'contextEnergy': contextEnergy,
       'contextSleep': contextSleep,
     };
+  }
+
+  static String sessionIdForDate(DateTime value) {
+    return _formatDate(value);
   }
 
   static String _formatDate(DateTime value) {

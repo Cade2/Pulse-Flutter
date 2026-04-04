@@ -8,6 +8,33 @@ final swipeSessionRepositoryProvider = Provider<SwipeSessionRepository>((ref) {
   return FirestoreSwipeSessionRepository(ref.watch(firebaseFirestoreProvider));
 });
 
+final currentSessionDateProvider = Provider<DateTime>((ref) {
+  return DateTime.now();
+});
+
+final todaySessionIdProvider = Provider<String>((ref) {
+  final DateTime currentDate = ref.watch(currentSessionDateProvider);
+  return SwipeSessionRecord.sessionIdForDate(currentDate);
+});
+
+final todaySwipeSessionProvider = StreamProvider<SwipeSessionRecord?>((ref) {
+  final String? uid = ref.watch(currentUserIdProvider);
+
+  if (uid == null || uid.isEmpty) {
+    return Stream.value(null);
+  }
+
+  final String sessionId = ref.watch(todaySessionIdProvider);
+
+  return ref
+      .watch(swipeSessionRepositoryProvider)
+      .watchSession(uid: uid, sessionId: sessionId);
+});
+
+final hasCompletedTodayProvider = Provider<bool>((ref) {
+  return ref.watch(todaySwipeSessionProvider).asData?.value != null;
+});
+
 final userSwipeSessionsProvider = StreamProvider<List<SwipeSessionRecord>>((
   ref,
 ) {

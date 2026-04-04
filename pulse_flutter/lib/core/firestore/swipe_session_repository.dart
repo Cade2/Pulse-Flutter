@@ -11,6 +11,11 @@ abstract class SwipeSessionRepository {
     String? contextSleep,
   });
 
+  Stream<SwipeSessionRecord?> watchSession({
+    required String uid,
+    required String sessionId,
+  });
+
   Stream<List<SwipeSessionRecord>> watchSessions({required String uid});
 }
 
@@ -42,6 +47,26 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
         .set(record.toFirestore());
 
     return record;
+  }
+
+  @override
+  Stream<SwipeSessionRecord?> watchSession({
+    required String uid,
+    required String sessionId,
+  }) {
+    return _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .snapshots()
+        .map((snapshot) {
+          if (!snapshot.exists) {
+            return null;
+          }
+
+          return SwipeSessionRecord.fromFirestore(snapshot);
+        });
   }
 
   @override

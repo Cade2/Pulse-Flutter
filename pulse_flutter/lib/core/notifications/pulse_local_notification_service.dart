@@ -1,10 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
+import 'package:pulse_flutter/core/notifications/pulse_push_message.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+
+abstract class PulseForegroundNotificationPresenter {
+  Future<void> showForegroundPushMessage(PulsePushMessage message);
+}
 
 abstract class PulseReminderService {
   Future<void> initialize();
@@ -62,7 +69,8 @@ class PulseReminderSyncState {
   );
 }
 
-class NoopPulseReminderService implements PulseReminderService {
+class NoopPulseReminderService
+    implements PulseReminderService, PulseForegroundNotificationPresenter {
   const NoopPulseReminderService();
 
   @override
@@ -76,6 +84,9 @@ class NoopPulseReminderService implements PulseReminderService {
     required PulseProfileSettings settings,
     required bool hasCompletedToday,
   }) async {}
+
+  @override
+  Future<void> showForegroundPushMessage(PulsePushMessage message) async {}
 }
 
 class PulseReminderSyncController {
@@ -96,7 +107,8 @@ class PulseReminderSyncController {
   }
 }
 
-class PulseLocalNotificationService implements PulseReminderService {
+class PulseLocalNotificationService
+    implements PulseReminderService, PulseForegroundNotificationPresenter {
   PulseLocalNotificationService({
     FlutterLocalNotificationsPlugin? notificationsPlugin,
   }) : _notificationsPlugin =
@@ -110,6 +122,7 @@ class PulseLocalNotificationService implements PulseReminderService {
   static const String dailyReminderChannelId = 'pulse_daily_reminders';
   static const String streakReminderChannelId = 'pulse_streak_risk_reminders';
   static const String weeklySummaryChannelId = 'pulse_weekly_summary';
+  static const String foregroundMessageChannelId = 'pulse_foreground_messages';
 
   static const String _dailyReminderChannelName = 'Daily reminders';
   static const String _dailyReminderChannelDescription =
@@ -120,6 +133,9 @@ class PulseLocalNotificationService implements PulseReminderService {
   static const String _weeklySummaryChannelName = 'Weekly summary reminders';
   static const String _weeklySummaryChannelDescription =
       'Pulse weekly summary reminder prompts.';
+  static const String _foregroundMessageChannelName = 'Foreground messages';
+  static const String _foregroundMessageChannelDescription =
+      'Foreground Firebase Cloud Messaging notifications.';
 
   static const TimeOfDay streakRiskWarningTime = TimeOfDay(hour: 18, minute: 0);
   static const TimeOfDay streakRiskFinalWarningTime = TimeOfDay(
@@ -255,6 +271,39 @@ class PulseLocalNotificationService implements PulseReminderService {
     }
 
     await _cancelTrackedReminders();
+  }
+
+  @override
+  Future<void> showForegroundPushMessage(PulsePushMessage message) async {
+    await initialize();
+
+    if (!_supportsNotifications || !message.hasDisplayContent) {
+      return;
+    }
+
+    final String payload = jsonEncode(message.toJson());
+
+    await _notificationsPlugin.show(
+      id: _foregroundNotificationIdFor(message),
+      title: message.title ?? 'Pulse',
+      body: message.body,
+      payload: payload,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          foregroundMessageChannelId,
+          _foregroundMessageChannelName,
+          channelDescription: _foregroundMessageChannelDescription,
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(
+          threadIdentifier: foregroundMessageChannelId,
+        ),
+        macOS: DarwinNotificationDetails(
+          threadIdentifier: foregroundMessageChannelId,
+        ),
+      ),
+    );
   }
 
   Future<void> _scheduleDailyReminder(PulseProfileSettings settings) async {
@@ -438,6 +487,14 @@ class PulseLocalNotificationService implements PulseReminderService {
         importance: Importance.defaultImportance,
       ),
     );
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        foregroundMessageChannelId,
+        _foregroundMessageChannelName,
+        description: _foregroundMessageChannelDescription,
+        importance: Importance.high,
+      ),
+    );
   }
 
   Future<void> _configureTimeZone() async {
@@ -495,5 +552,17 @@ class PulseLocalNotificationService implements PulseReminderService {
       case TargetPlatform.windows:
         return false;
     }
+  }
+
+  int _foregroundNotificationIdFor(PulsePushMessage message) {
+    final int candidate =
+        message.messageId?.hashCode ??
+        Object.hash(
+          message.title,
+          message.body,
+          message.data,
+          message.sentTime,
+        );
+    return candidate.abs() % 2147483647;
   }
 }

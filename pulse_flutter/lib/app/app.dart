@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/app/theme.dart';
+import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/messaging_providers.dart';
 import 'package:pulse_flutter/core/notifications/pulse_local_notification_service.dart';
 import 'package:pulse_flutter/core/providers/notification_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -18,10 +20,12 @@ class PulseApp extends ConsumerStatefulWidget {
 class _PulseAppState extends ConsumerState<PulseApp> {
   late final ProviderSubscription<PulseReminderSyncState?>
   _reminderSubscription;
+  late final ProviderSubscription<String?> _messagingUserSubscription;
 
   @override
   void initState() {
     super.initState();
+    unawaited(ref.read(pulseMessagingControllerProvider).initialize());
     _reminderSubscription = ref.listenManual<PulseReminderSyncState?>(
       pulseReminderSyncStateProvider,
       (previous, next) {
@@ -35,11 +39,25 @@ class _PulseAppState extends ConsumerState<PulseApp> {
       },
       fireImmediately: true,
     );
+    _messagingUserSubscription = ref.listenManual<String?>(
+      currentUserIdProvider,
+      (previous, next) {
+        if (previous == next) {
+          return;
+        }
+
+        unawaited(
+          ref.read(pulseMessagingControllerProvider).syncCurrentUser(next),
+        );
+      },
+      fireImmediately: true,
+    );
   }
 
   @override
   void dispose() {
     _reminderSubscription.close();
+    _messagingUserSubscription.close();
     super.dispose();
   }
 

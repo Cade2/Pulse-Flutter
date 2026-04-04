@@ -1,7 +1,10 @@
 export 'firebase/firebase_auth_service.dart';
 export 'firestore/swipe_session_repository.dart';
 export 'firestore/user_profile_repository.dart';
+export 'firestore/user_messaging_repository.dart';
 export 'notifications/pulse_local_notification_service.dart';
+export 'notifications/pulse_firebase_messaging_service.dart';
+export 'notifications/pulse_push_message.dart';
 export 'models/user_profile.dart';
 export 'models/pulse_badge.dart';
 export 'models/pulse_data_export.dart';
@@ -14,6 +17,7 @@ export 'models/pulse_weekly_pulse_score.dart';
 export 'providers/auth_providers.dart';
 export 'providers/badge_providers.dart';
 export 'providers/insight_providers.dart';
+export 'providers/messaging_providers.dart';
 export 'providers/notification_providers.dart';
 export 'providers/swipe_session_providers.dart';
 export 'providers/user_profile_providers.dart';

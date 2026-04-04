@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
@@ -64,6 +65,9 @@ class UserProfileRepository {
         'lastSessionDate': streak.lastSessionDate,
         'totalXp': levelProgress.totalXp,
         'currentLevel': levelProgress.currentLevel,
+        'unlockedBadgeIds': _resolveStoredBadgeIds(
+          existingData['unlockedBadgeIds'],
+        ),
         'lastSeenAt': FieldValue.serverTimestamp(),
       };
 
@@ -103,26 +107,40 @@ class UserProfileRepository {
           storedLevelProgress: PulseLevelProgress.fromFirestoreData(data),
           sessionHistory: sessionHistory,
         );
+    final List<String> reconciledBadgeIds = _resolveReconciledBadgeIds(
+      sessionHistory: sessionHistory,
+      streak: reconciledStreak,
+      levelProgress: reconciledLevelProgress,
+    );
 
     final bool streakNeedsWriteback = !profile.streak.matches(reconciledStreak);
     final bool levelNeedsWriteback =
         profile.totalXp != reconciledLevelProgress.totalXp ||
         profile.currentLevel != reconciledLevelProgress.currentLevel;
+    final bool badgesNeedWriteback = !_badgeIdsMatch(
+      profile.unlockedBadgeIds,
+      reconciledBadgeIds,
+    );
     final bool avatarNeedsWriteback = PulseUserProfile.needsAvatarColourRepair(
       data['avatarColour'],
     );
 
-    if (streakNeedsWriteback || levelNeedsWriteback || avatarNeedsWriteback) {
+    if (streakNeedsWriteback ||
+        levelNeedsWriteback ||
+        badgesNeedWriteback ||
+        avatarNeedsWriteback) {
       await userDocument(uid).set(<String, Object?>{
         if (streakNeedsWriteback) ...reconciledStreak.toFirestore(),
         if (levelNeedsWriteback) ...reconciledLevelProgress.toFirestore(),
+        if (badgesNeedWriteback) 'unlockedBadgeIds': reconciledBadgeIds,
         if (avatarNeedsWriteback) 'avatarColour': profile.avatarColour,
       }, SetOptions(merge: true));
     }
 
     return profile
         .withStreak(reconciledStreak)
-        .withLevelProgress(reconciledLevelProgress);
+        .withLevelProgress(reconciledLevelProgress)
+        .withUnlockedBadgeIds(reconciledBadgeIds);
   }
 
   Future<List<PulseSessionHistoryEntry>> _readSessionHistory(String uid) async {
@@ -168,12 +186,50 @@ class UserProfileRepository {
     );
   }
 
+  List<String> _resolveReconciledBadgeIds({
+    required List<PulseSessionHistoryEntry> sessionHistory,
+    required PulseStreak streak,
+    required PulseLevelProgress levelProgress,
+  }) {
+    return PulseBadgeCatalog.unlockedBadgeIds(
+      PulseBadgeProgressSnapshot(
+        sessionCount: sessionHistory.length,
+        longestStreak: streak.longestStreak,
+        currentLevel: levelProgress.currentLevel,
+      ),
+    );
+  }
+
   String? _resolveDisplayName(Object? existingValue, String? fallbackValue) {
     return _trimToNull(existingValue) ?? fallbackValue;
   }
 
   String _resolveAvatarColour(Object? existingValue) {
     return PulseUserProfile.normalizeAvatarColour(existingValue);
+  }
+
+  List<String> _resolveStoredBadgeIds(Object? value) {
+    if (value is! List) {
+      return const <String>[];
+    }
+
+    return PulseBadgeCatalog.sortedBadgeIds(
+      value.whereType<String>().map((item) => item.trim()),
+    );
+  }
+
+  bool _badgeIdsMatch(List<String> lhs, List<String> rhs) {
+    if (lhs.length != rhs.length) {
+      return false;
+    }
+
+    for (int index = 0; index < lhs.length; index++) {
+      if (lhs[index] != rhs[index]) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   String? _trimToNull(Object? value) {

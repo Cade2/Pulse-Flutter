@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
@@ -58,6 +59,11 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
     final PulseLevelProgress nextProgress = _resolveLevelProgressFromHistory(
       pendingHistory,
     );
+    final List<String> nextUnlockedBadgeIds = _resolveUnlockedBadgeIds(
+      pendingHistory,
+      nextStreak,
+      nextProgress,
+    );
     final int xpEarned = pendingSession.earnedXp;
 
     return _firestore.runTransaction((transaction) async {
@@ -82,10 +88,16 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
         final PulseStreak existingStreak = _resolveStreakFromHistory(
           existingHistory,
         );
+        final List<String> existingUnlockedBadgeIds = _resolveUnlockedBadgeIds(
+          existingHistory,
+          existingStreak,
+          existingProgress,
+        );
 
         transaction.set(userDocument, <String, Object?>{
           ...existingStreak.toFirestore(),
           ...existingProgress.toFirestore(),
+          'unlockedBadgeIds': existingUnlockedBadgeIds,
         }, SetOptions(merge: true));
 
         return SwipeSessionSaveResult(
@@ -99,6 +111,7 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
       transaction.set(userDocument, <String, Object?>{
         ...nextStreak.toFirestore(),
         ...nextProgress.toFirestore(),
+        'unlockedBadgeIds': nextUnlockedBadgeIds,
       }, SetOptions(merge: true));
 
       return SwipeSessionSaveResult(
@@ -160,6 +173,20 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
 
     return PulseLevelProgress.fromSessionXpAwards(
       sessionHistory.map((session) => session.earnedXp),
+    );
+  }
+
+  List<String> _resolveUnlockedBadgeIds(
+    List<PulseSessionHistoryEntry> sessionHistory,
+    PulseStreak streak,
+    PulseLevelProgress levelProgress,
+  ) {
+    return PulseBadgeCatalog.unlockedBadgeIds(
+      PulseBadgeProgressSnapshot(
+        sessionCount: sessionHistory.length,
+        longestStreak: streak.longestStreak,
+        currentLevel: levelProgress.currentLevel,
+      ),
     );
   }
 

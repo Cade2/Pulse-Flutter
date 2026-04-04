@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
@@ -254,6 +256,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                               )
                             : const Text('Save profile'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () => context.goNamed(AppRoutes.badgesName),
+                        child: const Text('View badges'),
                       ),
                     ],
                   ),

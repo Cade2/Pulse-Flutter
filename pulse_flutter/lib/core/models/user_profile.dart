@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 
@@ -26,6 +27,7 @@ class PulseUserProfile {
     this.lastSessionDate,
     this.totalXp = 0,
     this.currentLevel = 1,
+    this.unlockedBadgeIds = const <String>[],
     this.createdAt,
     this.lastSeenAt,
   });
@@ -39,6 +41,7 @@ class PulseUserProfile {
   final String? lastSessionDate;
   final int totalXp;
   final int currentLevel;
+  final List<String> unlockedBadgeIds;
   final DateTime? createdAt;
   final DateTime? lastSeenAt;
 
@@ -91,6 +94,7 @@ class PulseUserProfile {
       lastSessionDate: streak.lastSessionDate,
       totalXp: totalXp,
       currentLevel: currentLevel,
+      unlockedBadgeIds: unlockedBadgeIds,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
     );
@@ -107,6 +111,24 @@ class PulseUserProfile {
       lastSessionDate: lastSessionDate,
       totalXp: levelProgress.totalXp,
       currentLevel: levelProgress.currentLevel,
+      unlockedBadgeIds: unlockedBadgeIds,
+      createdAt: createdAt,
+      lastSeenAt: lastSeenAt,
+    );
+  }
+
+  PulseUserProfile withUnlockedBadgeIds(List<String> unlockedBadgeIds) {
+    return PulseUserProfile(
+      uid: uid,
+      email: email,
+      displayName: displayName,
+      avatarColour: avatarColour,
+      currentStreak: currentStreak,
+      longestStreak: longestStreak,
+      lastSessionDate: lastSessionDate,
+      totalXp: totalXp,
+      currentLevel: currentLevel,
+      unlockedBadgeIds: PulseBadgeCatalog.sortedBadgeIds(unlockedBadgeIds),
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
     );
@@ -136,6 +158,7 @@ class PulseUserProfile {
       lastSessionDate: streak.lastSessionDate,
       totalXp: _readNonNegativeInt(data['totalXp']),
       currentLevel: _readPositiveInt(data['currentLevel']) ?? 1,
+      unlockedBadgeIds: _readStringList(data['unlockedBadgeIds']),
       createdAt: _readTimestamp(data['createdAt']),
       lastSeenAt: _readTimestamp(data['lastSeenAt']),
     );
@@ -152,6 +175,7 @@ class PulseUserProfile {
       'lastSessionDate': lastSessionDate,
       'totalXp': totalXp,
       'currentLevel': currentLevel,
+      'unlockedBadgeIds': PulseBadgeCatalog.sortedBadgeIds(unlockedBadgeIds),
       if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
       if (lastSeenAt != null) 'lastSeenAt': Timestamp.fromDate(lastSeenAt!),
     };
@@ -228,5 +252,15 @@ class PulseUserProfile {
     }
 
     return null;
+  }
+
+  static List<String> _readStringList(Object? value) {
+    if (value is! List) {
+      return const <String>[];
+    }
+
+    return PulseBadgeCatalog.sortedBadgeIds(
+      value.whereType<String>().map((item) => item.trim()),
+    );
   }
 }

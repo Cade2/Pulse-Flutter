@@ -129,6 +129,72 @@ void main() {
     expect(find.text('Ava'), findsWidgets);
   });
 
+  testWidgets('badge screen is reachable from profile and shows progress', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-04',
+              acceptedEmotions: const ['Calm'],
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 0,
+              longestStreak: 3,
+              lastSessionDate: '2026-04-02',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 50, currentLevel: 1),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Profile'));
+    await tester.tap(find.text('Profile').last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('View badges'));
+    await tester.tap(find.text('View badges'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Badges'), findsOneWidget);
+    expect(find.text('Unlocked badges'), findsOneWidget);
+    expect(find.text('Locked badges'), findsOneWidget);
+    expect(find.text('First Pulse'), findsOneWidget);
+    expect(find.text('On A Roll'), findsOneWidget);
+    expect(find.text('Level Up'), findsOneWidget);
+    expect(find.text('Seven Check-Ins'), findsOneWidget);
+    expect(find.text('1 / 7 sessions'), findsOneWidget);
+    expect(find.text('Level 1 / 2'), findsOneWidget);
+    expect(find.text('Unlocked'), findsNWidgets(2));
+  });
+
   testWidgets('home shows done-for-today state when today already exists', (
     WidgetTester tester,
   ) async {

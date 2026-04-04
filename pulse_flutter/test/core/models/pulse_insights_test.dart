@@ -20,6 +20,7 @@ void main() {
           acceptedEmotions: const ['Hope'],
         ),
       ],
+      currentDate: DateTime(2026, 4, 4),
     );
 
     expect(report.availability, PulseInsightsAvailability.locked);
@@ -27,6 +28,8 @@ void main() {
     expect(report.sessionsUntilBasic, 2);
     expect(report.topAcceptedEmotion?.label, 'Calm');
     expect(report.topAcceptedEmotion?.count, 2);
+    expect(report.currentWeekScore.score, 86);
+    expect(report.weeklyScoreTrend, isNull);
   });
 
   test('basic insights unlock at five sessions with real rankings', () {
@@ -62,6 +65,7 @@ void main() {
           contextEnergy: 'Steady',
         ),
       ],
+      currentDate: DateTime(2026, 4, 15),
     );
 
     expect(report.availability, PulseInsightsAvailability.basic);
@@ -78,6 +82,9 @@ void main() {
     expect(report.topEmotionContextPattern?.emotion, 'Calm');
     expect(report.topEmotionContextPattern?.contextTag, 'Social: Friends');
     expect(report.topEmotionContextPattern?.count, 3);
+    expect(report.currentWeekScore.score, 92);
+    expect(report.previousWeekScore.score, 79);
+    expect(report.weeklyScoreTrend?.label, '+13 vs last week');
   });
 
   test(
@@ -104,6 +111,7 @@ void main() {
 
       final PulseInsightsReport report = PulseInsightsReport.fromSessions(
         sessions,
+        currentDate: DateTime(2026, 4, 12),
       );
 
       expect(report.availability, PulseInsightsAvailability.expanded);
@@ -118,6 +126,9 @@ void main() {
       expect(report.topEmotionContextPattern?.contextTag, 'Energy: Steady');
       expect(report.topEmotionContextPattern?.count, 9);
       expect(report.averageAcceptedPerSession, closeTo(23 / 14, 0.0001));
+      expect(report.currentWeekScore.score, 89);
+      expect(report.previousWeekScore.score, 90);
+      expect(report.weeklyScoreTrend?.label, '-1 vs last week');
     },
   );
 }

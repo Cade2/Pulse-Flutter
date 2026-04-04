@@ -9,10 +9,13 @@ final currentUserInsightsProvider = Provider<AsyncValue<PulseInsightsReport>>((
   final AsyncValue<List<SwipeSessionRecord>> sessionsAsync = ref.watch(
     userSwipeSessionsProvider,
   );
+  final DateTime currentDate = ref.watch(currentSessionDateProvider);
 
   return sessionsAsync.when<AsyncValue<PulseInsightsReport>>(
     data: (sessions) {
-      return AsyncValue.data(PulseInsightsReport.fromSessions(sessions));
+      return AsyncValue.data(
+        PulseInsightsReport.fromSessions(sessions, currentDate: currentDate),
+      );
     },
     loading: () => const AsyncValue.loading(),
     error: (error, stackTrace) => AsyncValue.error(error, stackTrace),

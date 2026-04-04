@@ -1,3 +1,4 @@
+import 'package:pulse_flutter/core/models/pulse_weekly_pulse_score.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 
 enum PulseInsightsAvailability { locked, basic, expanded }
@@ -39,6 +40,8 @@ class PulseInsightsReport {
     this.sleepTags = const <PulseInsightCount>[],
     this.weekdaySessions = const <PulseInsightCount>[],
     this.emotionContextPatterns = const <PulseInsightPattern>[],
+    required this.currentWeekScore,
+    required this.previousWeekScore,
   });
 
   final int totalSessions;
@@ -50,8 +53,14 @@ class PulseInsightsReport {
   final List<PulseInsightCount> sleepTags;
   final List<PulseInsightCount> weekdaySessions;
   final List<PulseInsightPattern> emotionContextPatterns;
+  final PulseWeeklyPulseScore currentWeekScore;
+  final PulseWeeklyPulseScore previousWeekScore;
 
-  factory PulseInsightsReport.fromSessions(List<SwipeSessionRecord> sessions) {
+  factory PulseInsightsReport.fromSessions(
+    List<SwipeSessionRecord> sessions, {
+    DateTime? currentDate,
+  }) {
+    final DateTime scoreAnchor = currentDate ?? DateTime.now();
     final List<PulseInsightCount> acceptedEmotionFrequency = _countValues(
       sessions.expand((session) => session.acceptedEmotions),
     );
@@ -72,6 +81,16 @@ class PulseInsightsReport {
     );
     final List<PulseInsightPattern> emotionContextPatterns =
         _countEmotionContextPatterns(sessions);
+    final PulseWeeklyPulseScore currentWeekScore =
+        PulseWeeklyPulseScore.fromHistory(
+          sessions,
+          weekStart: PulseWeeklyPulseScore.startOfWeek(scoreAnchor),
+        );
+    final PulseWeeklyPulseScore previousWeekScore =
+        PulseWeeklyPulseScore.fromHistory(
+          sessions,
+          weekStart: PulseWeeklyPulseScore.previousWeekStart(scoreAnchor),
+        );
 
     return PulseInsightsReport(
       totalSessions: sessions.length,
@@ -86,6 +105,8 @@ class PulseInsightsReport {
       sleepTags: sleepTags,
       weekdaySessions: weekdaySessions,
       emotionContextPatterns: emotionContextPatterns,
+      currentWeekScore: currentWeekScore,
+      previousWeekScore: previousWeekScore,
     );
   }
 
@@ -173,6 +194,10 @@ class PulseInsightsReport {
     }
 
     return emotionContextPatterns.first;
+  }
+
+  PulseWeeklyPulseScoreTrend? get weeklyScoreTrend {
+    return currentWeekScore.compareWith(previousWeekScore);
   }
 
   int progressToward(int unlockSessionCount) {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pulse_flutter/core/models/pulse_insights.dart';
+import 'package:pulse_flutter/core/models/pulse_streak.dart';
+import 'package:pulse_flutter/core/models/pulse_weekly_pulse_score.dart';
 import 'package:pulse_flutter/core/providers/insight_providers.dart';
+import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
@@ -11,6 +14,7 @@ class InsightsScreen extends ConsumerWidget {
     final AsyncValue<PulseInsightsReport> insightsAsync = ref.watch(
       currentUserInsightsProvider,
     );
+    final PulseStreak streak = ref.watch(currentUserStreakProvider);
     final TextTheme textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -28,6 +32,13 @@ class InsightsScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _InsightsSummaryCard(report: report),
+                      const SizedBox(height: 16),
+                      _StreakSummaryCard(streak: streak),
+                      const SizedBox(height: 16),
+                      _WeeklyPulseScoreCard(
+                        currentWeekScore: report.currentWeekScore,
+                        weeklyScoreTrend: report.weeklyScoreTrend,
+                      ),
                       const SizedBox(height: 24),
                       if (!report.hasBasicInsights)
                         _LockedInsightsCard(report: report)
@@ -128,7 +139,7 @@ class _InsightsSummaryCard extends StatelessWidget {
           Text('Pulse insights', style: textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
-            '${report.totalSessions} sessions saved',
+            '${report.totalSessions} sessions saved overall',
             style: textTheme.headlineMedium,
           ),
           const SizedBox(height: 8),
@@ -140,6 +151,93 @@ class _InsightsSummaryCard extends StatelessWidget {
                 : 'Insights unlock after 5 saved sessions.',
             style: textTheme.bodyMedium,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StreakSummaryCard extends StatelessWidget {
+  const _StreakSummaryCard({required this.streak});
+
+  final PulseStreak streak;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final int currentStreak = streak.currentStreak;
+    final int longestStreak = streak.longestStreak;
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Current streak', style: textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            currentStreak == 0
+                ? '0 days'
+                : '$currentStreak ${currentStreak == 1 ? 'day' : 'days'}',
+            style: textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            currentStreak == 0
+                ? 'No active streak yet. Your next check-in will restart the chain.'
+                : 'You are keeping Pulse alive day by day.',
+            style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Longest streak',
+            value: longestStreak == 0 ? '0 days' : '$longestStreak days',
+            supporting: 'Best run recorded so far.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyPulseScoreCard extends StatelessWidget {
+  const _WeeklyPulseScoreCard({
+    required this.currentWeekScore,
+    required this.weeklyScoreTrend,
+  });
+
+  final PulseWeeklyPulseScore currentWeekScore;
+  final PulseWeeklyPulseScoreTrend? weeklyScoreTrend;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Weekly Pulse Score', style: textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(currentWeekScore.scoreLabel, style: textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          Text(
+            currentWeekScore.dataAvailabilityLabel,
+            style: textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            currentWeekScore.dataAvailabilityMessage,
+            style: textTheme.bodyMedium,
+          ),
+          if (weeklyScoreTrend != null) ...[
+            const SizedBox(height: 16),
+            _InsightRow(
+              label: 'Week over week',
+              value: weeklyScoreTrend!.label,
+              supporting:
+                  'Compared with the previous saved week of Pulse history.',
+            ),
+          ],
         ],
       ),
     );

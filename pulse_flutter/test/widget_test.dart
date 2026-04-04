@@ -330,6 +330,9 @@ void main() {
           currentUserLevelProgressProvider.overrideWith(
             (ref) => const PulseLevelProgress(),
           ),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 4),
+          ),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),
@@ -343,6 +346,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_selectedBottomNavIndex(tester), 2);
+    expect(find.text('Current streak'), findsOneWidget);
+    expect(find.text('Weekly Pulse Score'), findsOneWidget);
+    expect(find.text('3 / 7 days checked in this week'), findsOneWidget);
+    expect(find.text('86'), findsOneWidget);
     expect(find.text('Insights are locked'), findsOneWidget);
     expect(find.text('3 / 5 sessions'), findsOneWidget);
     expect(
@@ -410,6 +417,9 @@ void main() {
             currentUserLevelProgressProvider.overrideWith(
               (ref) => const PulseLevelProgress(),
             ),
+            currentSessionDateProvider.overrideWith(
+              (ref) => DateTime(2026, 4, 15),
+            ),
             swipeSessionRepositoryProvider.overrideWith(
               (ref) => fakeRepository,
             ),
@@ -425,6 +435,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(_selectedBottomNavIndex(tester), 2);
+      expect(find.text('Current streak'), findsOneWidget);
+      expect(find.text('Weekly Pulse Score'), findsOneWidget);
+      expect(find.text('1 / 7 days checked in this week'), findsOneWidget);
+      expect(find.text('92'), findsOneWidget);
+      expect(find.text('+13 vs last week'), findsOneWidget);
       expect(find.text('Overview'), findsOneWidget);
       expect(find.text('Context breakdown'), findsOneWidget);
       expect(find.text('Top accepted emotions'), findsOneWidget);
@@ -488,6 +503,9 @@ void main() {
           currentUserLevelProgressProvider.overrideWith(
             (ref) => const PulseLevelProgress(totalXp: 200, currentLevel: 3),
           ),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 12),
+          ),
           swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
         ],
         child: const PulseApp(),
@@ -501,6 +519,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_selectedBottomNavIndex(tester), 2);
+    expect(find.text('Current streak'), findsOneWidget);
+    expect(find.text('Weekly Pulse Score'), findsOneWidget);
+    expect(find.text('7 / 7 days checked in this week'), findsOneWidget);
+    expect(find.text('89'), findsOneWidget);
+    expect(find.text('-1 vs last week'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('Context breakdown'), findsOneWidget);
     expect(find.text('Top accepted emotions'), findsOneWidget);
@@ -508,7 +531,7 @@ void main() {
     expect(find.text('Pattern signals'), findsOneWidget);
     expect(find.text('Session rhythm'), findsOneWidget);
     expect(find.text('Repeated emotion + context signals'), findsOneWidget);
-    expect(find.text('14 sessions saved'), findsOneWidget);
+    expect(find.text('14 sessions saved overall'), findsOneWidget);
     expect(find.text('Calm'), findsWidgets);
     expect(find.text('Social: Friends'), findsWidgets);
     expect(find.text('Most common social context'), findsOneWidget);

@@ -8,6 +8,7 @@ export 'models/pulse_streak.dart';
 export 'models/pulse_level_progress.dart';
 export 'models/pulse_profile_settings.dart';
 export 'models/pulse_session_history_entry.dart';
+export 'models/pulse_weekly_pulse_score.dart';
 export 'providers/auth_providers.dart';
 export 'providers/badge_providers.dart';
 export 'providers/insight_providers.dart';

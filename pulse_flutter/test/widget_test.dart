@@ -65,6 +65,40 @@ void main() {
     expect(find.text('Splash'), findsNothing);
   });
 
+  testWidgets('swiping right accepts and swiping left rejects a card', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Start swipe session'));
+    await tester.pumpAndSettle();
+
+    final Finder swipeCard = find.byKey(const Key('swipe-session-card'));
+    await tester.ensureVisible(swipeCard);
+
+    await tester.drag(swipeCard, const Offset(400, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Card 2 of 8'), findsOneWidget);
+    expect(find.text('Accepted 1 | Rejected 0'), findsOneWidget);
+
+    await tester.drag(swipeCard, const Offset(-400, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Card 3 of 8'), findsOneWidget);
+    expect(find.text('Accepted 1 | Rejected 1'), findsOneWidget);
+  });
+
   testWidgets('signed-in users can save an eight-card swipe session', (
     WidgetTester tester,
   ) async {

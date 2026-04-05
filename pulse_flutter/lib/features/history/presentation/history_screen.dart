@@ -4,7 +4,9 @@ import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({super.key, this.initialSessionId});
+
+  final String? initialSessionId;
 
   @override
   ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
@@ -22,6 +24,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   ];
 
   DateTime? _visibleMonth;
+  String? _openedInitialSessionId;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +38,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       body: SafeArea(
         child: sessionsAsync.when(
           data: (sessions) {
+            _maybeOpenInitialSession(sessions);
+
             if (sessions.isEmpty) {
               return Center(
                 child: ConstrainedBox(
@@ -249,6 +254,39 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) => _SessionDetailSheet(session: session),
     );
+  }
+
+  void _maybeOpenInitialSession(List<SwipeSessionRecord> sessions) {
+    final String? initialSessionId = widget.initialSessionId?.trim();
+    if (initialSessionId == null ||
+        initialSessionId.isEmpty ||
+        _openedInitialSessionId == initialSessionId) {
+      return;
+    }
+
+    SwipeSessionRecord? matchingSession;
+    for (final SwipeSessionRecord session in sessions) {
+      if (session.sessionId == initialSessionId) {
+        matchingSession = session;
+        break;
+      }
+    }
+
+    if (matchingSession == null) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _openedInitialSessionId == initialSessionId) {
+        return;
+      }
+
+      setState(() {
+        _openedInitialSessionId = initialSessionId;
+        _visibleMonth = _monthStart(matchingSession!.completedAt);
+      });
+      _showSessionDetail(context, matchingSession!);
+    });
   }
 
   static DateTime _monthStart(DateTime value) {

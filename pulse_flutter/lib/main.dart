@@ -41,6 +41,9 @@ Future<void> main() async {
         pulseForegroundNotificationPresenterProvider.overrideWithValue(
           notificationService,
         ),
+        pulsePushNotificationTapSourceProvider.overrideWithValue(
+          notificationService,
+        ),
         pulseMessagingServiceProvider.overrideWithValue(messagingService),
         userMessagingRepositoryProvider.overrideWithValue(
           userMessagingRepository,

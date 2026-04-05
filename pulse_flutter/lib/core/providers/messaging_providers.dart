@@ -13,6 +13,11 @@ final pulseForegroundNotificationPresenterProvider =
       return const NoopPulseReminderService();
     });
 
+final pulsePushNotificationTapSourceProvider =
+    Provider<PulsePushNotificationTapSource>((ref) {
+      return const NoopPulseReminderService();
+    });
+
 final userMessagingRepositoryProvider = Provider<UserMessagingRepository>((
   ref,
 ) {
@@ -28,6 +33,7 @@ final pulseMessagingControllerProvider = Provider<PulseMessagingController>((
     notificationPresenter: ref.watch(
       pulseForegroundNotificationPresenterProvider,
     ),
+    notificationTapSource: ref.watch(pulsePushNotificationTapSourceProvider),
   );
   ref.onDispose(controller.dispose);
   return controller;

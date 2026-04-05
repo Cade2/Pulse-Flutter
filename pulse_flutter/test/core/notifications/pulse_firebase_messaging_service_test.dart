@@ -17,12 +17,18 @@ void main() {
           _FakeUserMessagingRepository();
       final _FakeForegroundNotificationPresenter presenter =
           _FakeForegroundNotificationPresenter();
+      final _FakeNotificationTapSource notificationTapSource =
+          _FakeNotificationTapSource();
       final PulseMessagingController controller = PulseMessagingController(
         messagingService: messagingService,
         userMessagingRepository: repository,
         notificationPresenter: presenter,
+        notificationTapSource: notificationTapSource,
       );
-      addTearDown(controller.dispose);
+      addTearDown(() async {
+        await controller.dispose();
+        await notificationTapSource.dispose();
+      });
 
       await controller.initialize();
       await controller.syncCurrentUser('user-1');
@@ -40,14 +46,18 @@ void main() {
           _FakePulseMessagingService();
       final _FakeUserMessagingRepository repository =
           _FakeUserMessagingRepository();
+      final _FakeNotificationTapSource notificationTapSource =
+          _FakeNotificationTapSource();
       final PulseMessagingController controller = PulseMessagingController(
         messagingService: messagingService,
         userMessagingRepository: repository,
         notificationPresenter: _FakeForegroundNotificationPresenter(),
+        notificationTapSource: notificationTapSource,
       );
       addTearDown(() async {
         await controller.dispose();
         await messagingService.dispose();
+        await notificationTapSource.dispose();
       });
 
       await controller.initialize();
@@ -70,12 +80,18 @@ void main() {
           _FakePulseMessagingService(currentToken: 'token-1');
       final _FakeUserMessagingRepository repository =
           _FakeUserMessagingRepository();
+      final _FakeNotificationTapSource notificationTapSource =
+          _FakeNotificationTapSource();
       final PulseMessagingController controller = PulseMessagingController(
         messagingService: messagingService,
         userMessagingRepository: repository,
         notificationPresenter: _FakeForegroundNotificationPresenter(),
+        notificationTapSource: notificationTapSource,
       );
-      addTearDown(controller.dispose);
+      addTearDown(() async {
+        await controller.dispose();
+        await notificationTapSource.dispose();
+      });
 
       await controller.initialize();
       await controller.syncCurrentUser('user-1');
@@ -94,14 +110,18 @@ void main() {
           _FakePulseMessagingService();
       final _FakeForegroundNotificationPresenter presenter =
           _FakeForegroundNotificationPresenter();
+      final _FakeNotificationTapSource notificationTapSource =
+          _FakeNotificationTapSource();
       final PulseMessagingController controller = PulseMessagingController(
         messagingService: messagingService,
         userMessagingRepository: _FakeUserMessagingRepository(),
         notificationPresenter: presenter,
+        notificationTapSource: notificationTapSource,
       );
       addTearDown(() async {
         await controller.dispose();
         await messagingService.dispose();
+        await notificationTapSource.dispose();
       });
 
       await controller.initialize();
@@ -129,14 +149,18 @@ void main() {
               title: 'Welcome back',
             ),
           );
+      final _FakeNotificationTapSource notificationTapSource =
+          _FakeNotificationTapSource();
       final PulseMessagingController controller = PulseMessagingController(
         messagingService: messagingService,
         userMessagingRepository: _FakeUserMessagingRepository(),
         notificationPresenter: _FakeForegroundNotificationPresenter(),
+        notificationTapSource: notificationTapSource,
       );
       addTearDown(() async {
         await controller.dispose();
         await messagingService.dispose();
+        await notificationTapSource.dispose();
       });
 
       final Future<PulsePushMessage> openedMessageFuture =
@@ -153,6 +177,39 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(controller.lastOpenedMessage?.messageId, 'opened');
+    },
+  );
+
+  test(
+    'local notification taps are merged into opened-app handling',
+    () async {
+      final _FakePulseMessagingService messagingService =
+          _FakePulseMessagingService();
+      final _FakeNotificationTapSource notificationTapSource =
+          _FakeNotificationTapSource();
+      final PulseMessagingController controller = PulseMessagingController(
+        messagingService: messagingService,
+        userMessagingRepository: _FakeUserMessagingRepository(),
+        notificationPresenter: _FakeForegroundNotificationPresenter(),
+        notificationTapSource: notificationTapSource,
+      );
+      addTearDown(() async {
+        await controller.dispose();
+        await messagingService.dispose();
+        await notificationTapSource.dispose();
+      });
+
+      await controller.initialize();
+
+      notificationTapSource.tapController.add(
+        const PulsePushMessage(
+          messageId: 'local-opened',
+          data: <String, String>{'route': 'history'},
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.lastOpenedMessage?.messageId, 'local-opened');
     },
   );
 }
@@ -238,5 +295,22 @@ class _FakeForegroundNotificationPresenter
   @override
   Future<void> showForegroundPushMessage(PulsePushMessage message) async {
     shownMessages.add(message);
+  }
+}
+
+class _FakeNotificationTapSource implements PulsePushNotificationTapSource {
+  final StreamController<PulsePushMessage> tapController =
+      StreamController<PulsePushMessage>.broadcast();
+
+  @override
+  Future<PulsePushMessage?> getInitialPushNotificationTap() async {
+    return null;
+  }
+
+  @override
+  Stream<PulsePushMessage> get onPushNotificationTap => tapController.stream;
+
+  Future<void> dispose() async {
+    await tapController.close();
   }
 }

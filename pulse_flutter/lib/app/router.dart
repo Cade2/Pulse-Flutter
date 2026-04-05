@@ -51,6 +51,19 @@ abstract final class AppRoutes {
 
   static const String swipeSessionCompleteName = 'swipe-session-complete';
   static const String swipeSessionCompletePath = '/session/complete';
+
+  static String historyLocation({String? sessionId}) {
+    final String? trimmedSessionId = sessionId?.trim();
+    if (trimmedSessionId == null || trimmedSessionId.isEmpty) {
+      return historyPath;
+    }
+
+    final Uri uri = Uri(
+      path: historyPath,
+      queryParameters: <String, String>{'sessionId': trimmedSessionId},
+    );
+    return uri.toString();
+  }
 }
 
 class _AppRouterNotifier extends ChangeNotifier {
@@ -147,7 +160,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.historyPath,
             name: AppRoutes.historyName,
-            builder: (context, state) => const HistoryScreen(),
+            builder: (context, state) => HistoryScreen(
+              initialSessionId: state.uri.queryParameters['sessionId'],
+            ),
           ),
           GoRoute(
             path: AppRoutes.insightsPath,

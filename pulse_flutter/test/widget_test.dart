@@ -16,7 +16,11 @@ import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
+import 'package:pulse_flutter/core/notifications/pulse_firebase_messaging_service.dart';
+import 'package:pulse_flutter/core/notifications/pulse_local_notification_service.dart';
+import 'package:pulse_flutter/core/notifications/pulse_push_message.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/messaging_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 import 'package:pulse_flutter/features/swipe_session/models/emotion_card.dart';
@@ -100,6 +104,200 @@ void main() {
     expect(find.text('0 XP total'), findsOneWidget);
     expect(find.text('0 days'), findsOneWidget);
   });
+
+  testWidgets(
+    'launching from a notification routes into the targeted history detail',
+    (WidgetTester tester) async {
+      final _FakeWidgetMessagingService messagingService =
+          _FakeWidgetMessagingService(
+            initialMessage: const PulsePushMessage(
+              messageId: 'history-launch',
+              data: <String, String>{
+                'route': 'history',
+                'sessionId': '2026-04-04',
+              },
+            ),
+          );
+      final _FakeWidgetNotificationTapSource notificationTapSource =
+          _FakeWidgetNotificationTapSource();
+      addTearDown(() async {
+        await messagingService.dispose();
+        await notificationTapSource.dispose();
+      });
+      final _FakeSwipeSessionRepository fakeRepository =
+          _FakeSwipeSessionRepository(
+            sessions: [
+              _buildSessionRecord(
+                date: '2026-04-04',
+                acceptedEmotions: const ['Focus', 'Hope', 'Confidence'],
+                contextSocial: 'Friends',
+                contextEnergy: 'High',
+                contextSleep: 'Good',
+              ),
+            ],
+          );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => 'test-user'),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            currentUserProfileProvider.overrideWith(
+              (ref) => Stream.value(
+                _buildProfile(
+                  displayName: 'Maya',
+                  email: 'maya@example.com',
+                  avatarColour: '#10B981',
+                ),
+              ),
+            ),
+            currentUserStreakProvider.overrideWith(
+              (ref) => const PulseStreak(
+                currentStreak: 3,
+                longestStreak: 5,
+                lastSessionDate: '2026-04-04',
+              ),
+            ),
+            currentUserLevelProgressProvider.overrideWith(
+              (ref) => const PulseLevelProgress(totalXp: 180, currentLevel: 2),
+            ),
+            swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+            pulseMessagingServiceProvider.overrideWithValue(messagingService),
+            pulsePushNotificationTapSourceProvider.overrideWithValue(
+              notificationTapSource,
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(_selectedBottomNavIndex(tester), 1);
+      expect(find.text('History'), findsWidgets);
+      expect(find.text('Session details'), findsOneWidget);
+      expect(find.text('2026-04-04'), findsWidgets);
+      expect(find.text('Focus'), findsOneWidget);
+      expect(find.text('Energy: High'), findsOneWidget);
+    },
+  );
+
+  testWidgets('opened-app notification taps route to the intended screen', (
+    WidgetTester tester,
+  ) async {
+    final _FakeWidgetMessagingService messagingService =
+        _FakeWidgetMessagingService();
+    final _FakeWidgetNotificationTapSource notificationTapSource =
+        _FakeWidgetNotificationTapSource();
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository();
+    addTearDown(() async {
+      await messagingService.dispose();
+      await notificationTapSource.dispose();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+          pulseMessagingServiceProvider.overrideWithValue(messagingService),
+          pulsePushNotificationTapSourceProvider.overrideWithValue(
+            notificationTapSource,
+          ),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(_selectedBottomNavIndex(tester), 0);
+
+    messagingService.openedController.add(
+      const PulsePushMessage(
+        messageId: 'opened-insights',
+        data: <String, String>{'route': 'insights'},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_selectedBottomNavIndex(tester), 2);
+    expect(find.text('Insights'), findsWidgets);
+  });
+
+  testWidgets(
+    'foreground notification taps route through the local notification bridge',
+    (WidgetTester tester) async {
+      final _FakeWidgetMessagingService messagingService =
+          _FakeWidgetMessagingService();
+      final _FakeWidgetNotificationTapSource notificationTapSource =
+          _FakeWidgetNotificationTapSource();
+      addTearDown(() async {
+        await messagingService.dispose();
+        await notificationTapSource.dispose();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => 'test-user'),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            currentUserProfileProvider.overrideWith(
+              (ref) => Stream.value(
+                _buildProfile(
+                  displayName: 'Maya',
+                  email: 'maya@example.com',
+                  avatarColour: '#10B981',
+                ),
+              ),
+            ),
+            currentUserStreakProvider.overrideWith(
+              (ref) => const PulseStreak(),
+            ),
+            currentUserLevelProgressProvider.overrideWith(
+              (ref) => const PulseLevelProgress(),
+            ),
+            pulseMessagingServiceProvider.overrideWithValue(messagingService),
+            pulsePushNotificationTapSourceProvider.overrideWithValue(
+              notificationTapSource,
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      notificationTapSource.tapController.add(
+        const PulsePushMessage(
+          messageId: 'local-profile',
+          data: <String, String>{'route': 'profile'},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_selectedBottomNavIndex(tester), 4);
+      expect(find.text('Profile'), findsWidgets);
+      expect(find.text('Profile basics'), findsOneWidget);
+    },
+  );
 
   testWidgets('profile screen is reachable from home', (
     WidgetTester tester,
@@ -1353,6 +1551,70 @@ SwipeSessionRecord _buildSessionRecord({
     contextSleep: contextSleep,
     completedAt: DateTime.parse('$date 12:00:00'),
   );
+}
+
+class _FakeWidgetMessagingService implements PulseMessagingService {
+  _FakeWidgetMessagingService({this.initialMessage});
+
+  final StreamController<String> tokenRefreshController =
+      StreamController<String>.broadcast();
+  final StreamController<PulsePushMessage> foregroundController =
+      StreamController<PulsePushMessage>.broadcast();
+  final StreamController<PulsePushMessage> openedController =
+      StreamController<PulsePushMessage>.broadcast();
+
+  PulsePushMessage? initialMessage;
+  @override
+  Future<PulsePushMessage?> getInitialMessage() async {
+    return initialMessage;
+  }
+
+  @override
+  Future<String?> getToken() async {
+    return null;
+  }
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Stream<PulsePushMessage> get onForegroundMessage =>
+      foregroundController.stream;
+
+  @override
+  Stream<PulsePushMessage> get onMessageOpenedApp => openedController.stream;
+
+  @override
+  Stream<String> get onTokenRefresh => tokenRefreshController.stream;
+
+  @override
+  Future<void> requestPermission() async {}
+
+  Future<void> dispose() async {
+    await tokenRefreshController.close();
+    await foregroundController.close();
+    await openedController.close();
+  }
+}
+
+class _FakeWidgetNotificationTapSource
+    implements PulsePushNotificationTapSource {
+  _FakeWidgetNotificationTapSource();
+
+  final StreamController<PulsePushMessage> tapController =
+      StreamController<PulsePushMessage>.broadcast();
+
+  @override
+  Future<PulsePushMessage?> getInitialPushNotificationTap() async {
+    return null;
+  }
+
+  @override
+  Stream<PulsePushMessage> get onPushNotificationTap => tapController.stream;
+
+  Future<void> dispose() async {
+    await tapController.close();
+  }
 }
 
 class _FakeUserProfileRepository implements UserProfileRepository {

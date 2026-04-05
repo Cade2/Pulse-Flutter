@@ -125,13 +125,16 @@ class PulseMessagingController {
     required PulseMessagingService messagingService,
     required UserMessagingRepository userMessagingRepository,
     required PulseForegroundNotificationPresenter notificationPresenter,
+    required PulsePushNotificationTapSource notificationTapSource,
   }) : _messagingService = messagingService,
        _userMessagingRepository = userMessagingRepository,
-       _notificationPresenter = notificationPresenter;
+       _notificationPresenter = notificationPresenter,
+       _notificationTapSource = notificationTapSource;
 
   final PulseMessagingService _messagingService;
   final UserMessagingRepository _userMessagingRepository;
   final PulseForegroundNotificationPresenter _notificationPresenter;
+  final PulsePushNotificationTapSource _notificationTapSource;
 
   final StreamController<PulsePushMessage> _openedMessagesController =
       StreamController<PulsePushMessage>.broadcast();
@@ -139,6 +142,7 @@ class PulseMessagingController {
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<PulsePushMessage>? _foregroundMessageSubscription;
   StreamSubscription<PulsePushMessage>? _openedMessageSubscription;
+  StreamSubscription<PulsePushMessage>? _notificationTapSubscription;
   Future<void>? _initialization;
 
   String? _currentUid;
@@ -187,6 +191,7 @@ class PulseMessagingController {
     await _tokenRefreshSubscription?.cancel();
     await _foregroundMessageSubscription?.cancel();
     await _openedMessageSubscription?.cancel();
+    await _notificationTapSubscription?.cancel();
     await _openedMessagesController.close();
   }
 
@@ -200,11 +205,19 @@ class PulseMessagingController {
       _handleOpenedMessage(initialMessage);
     }
 
+    final PulsePushMessage? initialNotificationTap = await _notificationTapSource
+        .getInitialPushNotificationTap();
+    if (initialNotificationTap != null) {
+      _handleOpenedMessage(initialNotificationTap);
+    }
+
     _foregroundMessageSubscription = _messagingService.onForegroundMessage
         .listen(_handleForegroundMessage);
     _openedMessageSubscription = _messagingService.onMessageOpenedApp.listen(
       _handleOpenedMessage,
     );
+    _notificationTapSubscription = _notificationTapSource.onPushNotificationTap
+        .listen(_handleOpenedMessage);
     _tokenRefreshSubscription = _messagingService.onTokenRefresh.listen((
       token,
     ) async {
@@ -248,6 +261,10 @@ class PulseMessagingController {
   }
 
   void _handleOpenedMessage(PulsePushMessage message) {
+    if (_lastOpenedMessage?.routingKey == message.routingKey) {
+      return;
+    }
+
     _lastOpenedMessage = message;
     debugPrint('Pulse FCM opened message: ${message.toJson()}');
     if (!_openedMessagesController.isClosed) {

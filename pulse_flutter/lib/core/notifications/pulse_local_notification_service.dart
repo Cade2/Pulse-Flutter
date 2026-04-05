@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,11 @@ import 'package:timezone/timezone.dart' as tz;
 
 abstract class PulseForegroundNotificationPresenter {
   Future<void> showForegroundPushMessage(PulsePushMessage message);
+}
+
+abstract class PulsePushNotificationTapSource {
+  Future<PulsePushMessage?> getInitialPushNotificationTap();
+  Stream<PulsePushMessage> get onPushNotificationTap;
 }
 
 abstract class PulseReminderService {
@@ -70,7 +76,10 @@ class PulseReminderSyncState {
 }
 
 class NoopPulseReminderService
-    implements PulseReminderService, PulseForegroundNotificationPresenter {
+    implements
+        PulseReminderService,
+        PulseForegroundNotificationPresenter,
+        PulsePushNotificationTapSource {
   const NoopPulseReminderService();
 
   @override
@@ -78,6 +87,15 @@ class NoopPulseReminderService
 
   @override
   Future<void> initialize() async {}
+
+  @override
+  Future<PulsePushMessage?> getInitialPushNotificationTap() async {
+    return null;
+  }
+
+  @override
+  Stream<PulsePushMessage> get onPushNotificationTap =>
+      const Stream<PulsePushMessage>.empty();
 
   @override
   Future<void> syncReminders({
@@ -108,7 +126,10 @@ class PulseReminderSyncController {
 }
 
 class PulseLocalNotificationService
-    implements PulseReminderService, PulseForegroundNotificationPresenter {
+    implements
+        PulseReminderService,
+        PulseForegroundNotificationPresenter,
+        PulsePushNotificationTapSource {
   PulseLocalNotificationService({
     FlutterLocalNotificationsPlugin? notificationsPlugin,
   }) : _notificationsPlugin =
@@ -148,8 +169,11 @@ class PulseLocalNotificationService
   );
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin;
+  final StreamController<PulsePushMessage> _pushNotificationTapController =
+      StreamController<PulsePushMessage>.broadcast();
 
   Future<void>? _initialization;
+  PulsePushMessage? _initialPushNotificationTap;
 
   static DateTime nextReminderDate({
     required TimeOfDay reminderTime,
@@ -218,6 +242,16 @@ class PulseLocalNotificationService
   Future<void> initialize() {
     return _initialization ??= _initializeInternal();
   }
+
+  @override
+  Future<PulsePushMessage?> getInitialPushNotificationTap() async {
+    await initialize();
+    return _initialPushNotificationTap;
+  }
+
+  @override
+  Stream<PulsePushMessage> get onPushNotificationTap =>
+      _pushNotificationTapController.stream;
 
   @override
   Future<void> syncReminders({
@@ -455,7 +489,20 @@ class PulseLocalNotificationService
           macOS: darwinInitializationSettings,
         );
 
-    await _notificationsPlugin.initialize(settings: initializationSettings);
+    await _notificationsPlugin.initialize(
+      settings: initializationSettings,
+      onDidReceiveNotificationResponse: _handleNotificationResponse,
+    );
+
+    final NotificationAppLaunchDetails? launchDetails = await _notificationsPlugin
+        .getNotificationAppLaunchDetails();
+    final NotificationResponse? notificationResponse =
+        launchDetails?.notificationResponse;
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      _initialPushNotificationTap = _messageFromPayload(
+        notificationResponse?.payload,
+      );
+    }
 
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
         _notificationsPlugin
@@ -564,5 +611,35 @@ class PulseLocalNotificationService
           message.sentTime,
         );
     return candidate.abs() % 2147483647;
+  }
+
+  void _handleNotificationResponse(NotificationResponse response) {
+    final PulsePushMessage? message = _messageFromPayload(response.payload);
+    if (message == null || _pushNotificationTapController.isClosed) {
+      return;
+    }
+
+    _pushNotificationTapController.add(message);
+  }
+
+  PulsePushMessage? _messageFromPayload(String? payload) {
+    final String? trimmedPayload = payload?.trim();
+    if (trimmedPayload == null || trimmedPayload.isEmpty) {
+      return null;
+    }
+
+    try {
+      final Object? decoded = jsonDecode(trimmedPayload);
+      if (decoded is! Map<Object?, Object?>) {
+        return null;
+      }
+
+      return PulsePushMessage.fromJson(
+        Map<String, dynamic>.from(decoded.cast<String, dynamic>()),
+      );
+    } catch (error) {
+      debugPrint('Pulse local notification payload parse failed: $error');
+      return null;
+    }
   }
 }

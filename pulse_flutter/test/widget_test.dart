@@ -794,6 +794,97 @@ void main() {
     },
   );
 
+  testWidgets('insights screen opens the Pulse share card preview', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-01',
+              acceptedEmotions: const ['Calm', 'Joy'],
+              contextSocial: 'Friends',
+              contextEnergy: 'Steady',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-03',
+              acceptedEmotions: const ['Calm'],
+              contextSocial: 'Friends',
+              contextSleep: 'Good',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-08',
+              acceptedEmotions: const ['Focus'],
+              contextEnergy: 'High',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-10',
+              acceptedEmotions: const ['Calm', 'Hope'],
+              contextSocial: 'Friends',
+              contextSleep: 'Good',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-15',
+              acceptedEmotions: const ['Joy'],
+              contextSocial: 'Friends',
+              contextEnergy: 'Steady',
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 4,
+              longestStreak: 6,
+              lastSessionDate: '2026-04-15',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 15),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Insights'));
+    await tester.tap(find.text('Insights').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('open-share-card-button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('open-share-card-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Share your Pulse snapshot'), findsOneWidget);
+    expect(find.text('My Pulse snapshot'), findsOneWidget);
+    expect(find.text('Weekly Pulse Score'), findsWidgets);
+    expect(find.text('Current streak'), findsWidgets);
+    expect(find.text('Top emotions'), findsWidgets);
+    expect(find.text('Copy share text'), findsOneWidget);
+  });
+
   testWidgets('insights screen shows expanded patterns from saved history', (
     WidgetTester tester,
   ) async {

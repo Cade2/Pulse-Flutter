@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pulse_flutter/components/pulse_share_card.dart';
 import 'package:pulse_flutter/core/models/pulse_insights.dart';
+import 'package:pulse_flutter/core/models/pulse_share_card_data.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/pulse_weekly_pulse_score.dart';
 import 'package:pulse_flutter/core/providers/insight_providers.dart';
@@ -31,6 +34,22 @@ class InsightsScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          key: const Key('open-share-card-button'),
+                          onPressed: () => _showShareCardSheet(
+                            context,
+                            PulseShareCardData.fromInsights(
+                              report: report,
+                              streak: streak,
+                            ),
+                          ),
+                          icon: const Icon(Icons.ios_share_rounded),
+                          label: const Text('Share snapshot'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       _InsightsSummaryCard(report: report),
                       const SizedBox(height: 16),
                       _StreakSummaryCard(streak: streak),
@@ -119,6 +138,39 @@ class InsightsScreen extends ConsumerWidget {
           },
         ),
       ),
+    );
+  }
+
+  Future<void> _showShareCardSheet(
+    BuildContext context,
+    PulseShareCardData shareCardData,
+  ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) {
+        return _ShareCardSheet(
+          data: shareCardData,
+          onCopy: () async {
+            await Clipboard.setData(
+              ClipboardData(text: shareCardData.toShareText()),
+            );
+
+            if (!sheetContext.mounted) {
+              return;
+            }
+
+            Navigator.of(sheetContext).pop();
+            messenger.showSnackBar(
+              const SnackBar(content: Text('Pulse share text copied.')),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -604,6 +656,68 @@ class _InsightsCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
       ),
       child: Padding(padding: const EdgeInsets.all(20), child: child),
+    );
+  }
+}
+
+class _ShareCardSheet extends StatelessWidget {
+  const _ShareCardSheet({required this.data, required this.onCopy});
+
+  final PulseShareCardData data;
+  final Future<void> Function() onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return FractionallySizedBox(
+      heightFactor: 0.88,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Share your Pulse snapshot',
+              style: textTheme.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Preview the share card and copy a text version for now.',
+              style: textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: PulseShareCard(data: data),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: onCopy,
+              child: const Text('Copy share text'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

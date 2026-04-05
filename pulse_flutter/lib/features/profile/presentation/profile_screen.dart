@@ -674,6 +674,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   icon: const Icon(Icons.share_rounded),
                                   label: const Text('Share invite'),
                                 ),
+                                OutlinedButton.icon(
+                                  key: const Key(
+                                    'profile-view-friends-button',
+                                  ),
+                                  onPressed: _isBusy
+                                      ? null
+                                      : () => context.goNamed(
+                                          AppRoutes.leaderboardName,
+                                        ),
+                                  icon: const Icon(Icons.groups_rounded),
+                                  label: const Text('View friends'),
+                                ),
                               ],
                             ),
                           ],

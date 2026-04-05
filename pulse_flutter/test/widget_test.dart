@@ -347,6 +347,7 @@ void main() {
     expect(find.text('Referral code'), findsOneWidget);
     expect(find.text('Copy code'), findsOneWidget);
     expect(find.text('Share invite'), findsOneWidget);
+    expect(find.text('View friends'), findsOneWidget);
     expect(find.text('Save changes'), findsOneWidget);
     expect(find.text('Ava'), findsWidgets);
   });
@@ -409,6 +410,67 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'friends leaderboard screen is reachable from profile and shows empty state',
+    (WidgetTester tester) async {
+      final String referralCode = PulseReferral.generateReferralCode('test-user');
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => 'test-user'),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            currentUserProfileProvider.overrideWith(
+              (ref) => Stream.value(
+                _buildProfile(
+                  displayName: 'Ava',
+                  email: 'ava@example.com',
+                  avatarColour: '#EC4899',
+                  referralCode: referralCode,
+                  referralCount: 0,
+                ),
+              ),
+            ),
+            currentUserStreakProvider.overrideWith(
+              (ref) => const PulseStreak(
+                currentStreak: 4,
+                longestStreak: 7,
+                lastSessionDate: '2026-04-05',
+              ),
+            ),
+            currentUserLevelProgressProvider.overrideWith(
+              (ref) => const PulseLevelProgress(totalXp: 180, currentLevel: 2),
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Profile'));
+      await tester.tap(find.text('Profile').last);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('profile-view-friends-button')),
+      );
+      await tester.tap(find.byKey(const Key('profile-view-friends-button')));
+      await tester.pumpAndSettle();
+
+      expect(_selectedBottomNavIndex(tester), 4);
+      expect(find.text('Friends'), findsWidgets);
+      expect(find.text('Your Pulse circle'), findsOneWidget);
+      expect(find.textContaining(referralCode), findsWidgets);
+      expect(find.text('Your row'), findsOneWidget);
+      expect(find.text('No friends yet'), findsOneWidget);
+      expect(find.text('Ava'), findsOneWidget);
+      expect(find.text('4 day streak'), findsOneWidget);
+      expect(find.text('Level 2'), findsOneWidget);
+    },
+  );
 
   testWidgets('profile settings save and reload correctly', (
     WidgetTester tester,

@@ -9,6 +9,7 @@ import 'package:pulse_flutter/features/badges/presentation/badges_screen.dart';
 import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
 import 'package:pulse_flutter/features/history/presentation/history_screen.dart';
 import 'package:pulse_flutter/features/insights/presentation/insights_screen.dart';
+import 'package:pulse_flutter/features/leaderboard/presentation/leaderboard_screen.dart';
 import 'package:pulse_flutter/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pulse_flutter/features/profile/presentation/profile_screen.dart';
 import 'package:pulse_flutter/features/splash/presentation/splash_screen.dart';
@@ -36,6 +37,9 @@ abstract final class AppRoutes {
 
   static const String profileName = 'profile';
   static const String profilePath = '/profile';
+
+  static const String leaderboardName = 'leaderboard';
+  static const String leaderboardPath = '/profile/friends';
 
   static const String badgesName = 'badges';
   static const String badgesPath = '/badges';
@@ -178,6 +182,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.profilePath,
             name: AppRoutes.profileName,
             builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.leaderboardPath,
+            name: AppRoutes.leaderboardName,
+            builder: (context, state) => const LeaderboardScreen(),
           ),
         ],
       ),

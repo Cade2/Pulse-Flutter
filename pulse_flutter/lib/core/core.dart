@@ -13,6 +13,7 @@ export 'models/pulse_insights.dart';
 export 'models/pulse_streak.dart';
 export 'models/pulse_level_progress.dart';
 export 'models/pulse_profile_settings.dart';
+export 'models/pulse_referral.dart';
 export 'models/pulse_share_card_data.dart';
 export 'models/pulse_session_history_entry.dart';
 export 'models/pulse_weekly_pulse_score.dart';

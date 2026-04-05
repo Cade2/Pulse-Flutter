@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
+import 'package:pulse_flutter/core/models/pulse_referral.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 
 class PulseUserProfile {
@@ -29,6 +30,8 @@ class PulseUserProfile {
     this.totalXp = 0,
     this.currentLevel = 1,
     this.unlockedBadgeIds = const <String>[],
+    this.referralCode,
+    this.referralCount = PulseReferral.defaultReferralCount,
     this.settings = const PulseProfileSettings(),
     this.createdAt,
     this.lastSeenAt,
@@ -44,6 +47,8 @@ class PulseUserProfile {
   final int totalXp;
   final int currentLevel;
   final List<String> unlockedBadgeIds;
+  final String? referralCode;
+  final int referralCount;
   final PulseProfileSettings settings;
   final DateTime? createdAt;
   final DateTime? lastSeenAt;
@@ -98,6 +103,8 @@ class PulseUserProfile {
       totalXp: totalXp,
       currentLevel: currentLevel,
       unlockedBadgeIds: unlockedBadgeIds,
+      referralCode: referralCode,
+      referralCount: referralCount,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -116,6 +123,8 @@ class PulseUserProfile {
       totalXp: levelProgress.totalXp,
       currentLevel: levelProgress.currentLevel,
       unlockedBadgeIds: unlockedBadgeIds,
+      referralCode: referralCode,
+      referralCount: referralCount,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -134,6 +143,8 @@ class PulseUserProfile {
       totalXp: totalXp,
       currentLevel: currentLevel,
       unlockedBadgeIds: PulseBadgeCatalog.sortedBadgeIds(unlockedBadgeIds),
+      referralCode: referralCode,
+      referralCount: referralCount,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -152,6 +163,31 @@ class PulseUserProfile {
       totalXp: totalXp,
       currentLevel: currentLevel,
       unlockedBadgeIds: unlockedBadgeIds,
+      referralCode: referralCode,
+      referralCount: referralCount,
+      settings: settings,
+      createdAt: createdAt,
+      lastSeenAt: lastSeenAt,
+    );
+  }
+
+  PulseUserProfile withReferral({
+    required String referralCode,
+    required int referralCount,
+  }) {
+    return PulseUserProfile(
+      uid: uid,
+      email: email,
+      displayName: displayName,
+      avatarColour: avatarColour,
+      currentStreak: currentStreak,
+      longestStreak: longestStreak,
+      lastSessionDate: lastSessionDate,
+      totalXp: totalXp,
+      currentLevel: currentLevel,
+      unlockedBadgeIds: unlockedBadgeIds,
+      referralCode: referralCode,
+      referralCount: referralCount,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -183,6 +219,11 @@ class PulseUserProfile {
       totalXp: _readNonNegativeInt(data['totalXp']),
       currentLevel: _readPositiveInt(data['currentLevel']) ?? 1,
       unlockedBadgeIds: _readStringList(data['unlockedBadgeIds']),
+      referralCode: PulseReferral.resolveReferralCode(
+        data['referralCode'],
+        uid: snapshot.id,
+      ),
+      referralCount: PulseReferral.resolveReferralCount(data['referralCount']),
       settings: PulseProfileSettings.fromFirestoreData(data['settings']),
       createdAt: _readTimestamp(data['createdAt']),
       lastSeenAt: _readTimestamp(data['lastSeenAt']),
@@ -201,6 +242,8 @@ class PulseUserProfile {
       'totalXp': totalXp,
       'currentLevel': currentLevel,
       'unlockedBadgeIds': PulseBadgeCatalog.sortedBadgeIds(unlockedBadgeIds),
+      'referralCode': PulseReferral.resolveReferralCode(referralCode, uid: uid),
+      'referralCount': PulseReferral.resolveReferralCount(referralCount),
       'settings': settings.toFirestore(),
       if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
       if (lastSeenAt != null) 'lastSeenAt': Timestamp.fromDate(lastSeenAt!),

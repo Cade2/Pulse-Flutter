@@ -16,6 +16,7 @@ import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_insights.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
+import 'package:pulse_flutter/core/models/pulse_referral.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/notifications/pulse_firebase_messaging_service.dart';
@@ -343,8 +344,70 @@ void main() {
     expect(find.text('Reminder time'), findsOneWidget);
     expect(find.text('Daily reminders'), findsOneWidget);
     expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Referral code'), findsOneWidget);
+    expect(find.text('Copy code'), findsOneWidget);
+    expect(find.text('Share invite'), findsOneWidget);
     expect(find.text('Save changes'), findsOneWidget);
     expect(find.text('Ava'), findsWidgets);
+  });
+
+  testWidgets('profile referral section shows code and opens invite share', (
+    WidgetTester tester,
+  ) async {
+    final String referralCode = PulseReferral.generateReferralCode('test-user');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+                referralCode: referralCode,
+                referralCount: 2,
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Profile'));
+    await tester.tap(find.text('Profile').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Referral code'), findsOneWidget);
+    expect(find.text(referralCode), findsOneWidget);
+    expect(find.text('2 referrals so far'), findsOneWidget);
+    expect(
+      find.byKey(const Key('profile-copy-referral-button')),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const Key('profile-share-referral-button')),
+    );
+    await tester.tap(find.byKey(const Key('profile-share-referral-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Share your referral'), findsOneWidget);
+    expect(find.text('Copy invite text'), findsOneWidget);
+    expect(
+      find.textContaining('Referral code: $referralCode'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('profile settings save and reload correctly', (
@@ -1678,6 +1741,8 @@ PulseUserProfile _buildProfile({
   required String email,
   String? displayName,
   String avatarColour = PulseUserProfile.defaultAvatarColour,
+  String? referralCode,
+  int referralCount = PulseReferral.defaultReferralCount,
   PulseProfileSettings settings = const PulseProfileSettings(),
 }) {
   return PulseUserProfile(
@@ -1685,6 +1750,8 @@ PulseUserProfile _buildProfile({
     email: email,
     displayName: displayName,
     avatarColour: avatarColour,
+    referralCode: referralCode,
+    referralCount: referralCount,
     settings: settings,
   );
 }
@@ -1884,6 +1951,8 @@ class _FakeUserProfileRepository implements UserProfileRepository {
       totalXp: _currentProfile.totalXp,
       currentLevel: _currentProfile.currentLevel,
       unlockedBadgeIds: _currentProfile.unlockedBadgeIds,
+      referralCode: _currentProfile.referralCode,
+      referralCount: _currentProfile.referralCount,
       settings: settings,
       createdAt: _currentProfile.createdAt,
       lastSeenAt: _currentProfile.lastSeenAt,

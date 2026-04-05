@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
+import 'package:pulse_flutter/core/models/pulse_referral.dart';
 import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
@@ -55,6 +56,13 @@ class UserProfileRepository {
       final PulseProfileSettings settings = _resolveSettings(
         existingData['settings'],
       );
+      final String referralCode = _resolveReferralCode(
+        existingData['referralCode'],
+        uid: bootstrapProfile.uid,
+      );
+      final int referralCount = _resolveReferralCount(
+        existingData['referralCount'],
+      );
 
       final Map<String, Object?> payload = <String, Object?>{
         'uid': bootstrapProfile.uid,
@@ -72,6 +80,8 @@ class UserProfileRepository {
         'unlockedBadgeIds': _resolveStoredBadgeIds(
           existingData['unlockedBadgeIds'],
         ),
+        'referralCode': referralCode,
+        'referralCount': referralCount,
         'settings': settings.toFirestore(),
         'lastSeenAt': FieldValue.serverTimestamp(),
       };
@@ -122,6 +132,13 @@ class UserProfileRepository {
     final PulseProfileSettings reconciledSettings = _resolveSettings(
       data['settings'],
     );
+    final String reconciledReferralCode = _resolveReferralCode(
+      data['referralCode'],
+      uid: uid,
+    );
+    final int reconciledReferralCount = _resolveReferralCount(
+      data['referralCount'],
+    );
 
     final bool streakNeedsWriteback = !profile.streak.matches(reconciledStreak);
     final bool levelNeedsWriteback =
@@ -137,18 +154,28 @@ class UserProfileRepository {
     final bool settingsNeedWriteback = PulseProfileSettings.needsRepair(
       data['settings'],
     );
+    final bool referralCodeNeedsWriteback = PulseReferral.needsReferralCodeRepair(
+      data['referralCode'],
+      uid: uid,
+    );
+    final bool referralCountNeedsWriteback =
+        PulseReferral.needsReferralCountRepair(data['referralCount']);
 
     if (streakNeedsWriteback ||
         levelNeedsWriteback ||
         badgesNeedWriteback ||
         avatarNeedsWriteback ||
-        settingsNeedWriteback) {
+        settingsNeedWriteback ||
+        referralCodeNeedsWriteback ||
+        referralCountNeedsWriteback) {
       await userDocument(uid).set(<String, Object?>{
         if (streakNeedsWriteback) ...reconciledStreak.toFirestore(),
         if (levelNeedsWriteback) ...reconciledLevelProgress.toFirestore(),
         if (badgesNeedWriteback) 'unlockedBadgeIds': reconciledBadgeIds,
         if (avatarNeedsWriteback) 'avatarColour': profile.avatarColour,
         if (settingsNeedWriteback) 'settings': reconciledSettings.toFirestore(),
+        if (referralCodeNeedsWriteback) 'referralCode': reconciledReferralCode,
+        if (referralCountNeedsWriteback) 'referralCount': reconciledReferralCount,
       }, SetOptions(merge: true));
     }
 
@@ -156,6 +183,10 @@ class UserProfileRepository {
         .withStreak(reconciledStreak)
         .withLevelProgress(reconciledLevelProgress)
         .withUnlockedBadgeIds(reconciledBadgeIds)
+        .withReferral(
+          referralCode: reconciledReferralCode,
+          referralCount: reconciledReferralCount,
+        )
         .withSettings(reconciledSettings);
   }
 
@@ -226,6 +257,14 @@ class UserProfileRepository {
 
   PulseProfileSettings _resolveSettings(Object? existingValue) {
     return PulseProfileSettings.fromFirestoreData(existingValue);
+  }
+
+  String _resolveReferralCode(Object? existingValue, {required String uid}) {
+    return PulseReferral.resolveReferralCode(existingValue, uid: uid);
+  }
+
+  int _resolveReferralCount(Object? existingValue) {
+    return PulseReferral.resolveReferralCount(existingValue);
   }
 
   List<String> _resolveStoredBadgeIds(Object? value) {

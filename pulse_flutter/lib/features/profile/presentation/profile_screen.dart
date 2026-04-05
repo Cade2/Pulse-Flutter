@@ -6,6 +6,7 @@ import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
 import 'package:pulse_flutter/core/models/pulse_data_export.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
+import 'package:pulse_flutter/core/models/pulse_referral.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/account_providers.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
@@ -221,6 +222,55 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Future<void> _copyReferralCode(String referralCode) async {
+    await Clipboard.setData(ClipboardData(text: referralCode));
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Referral code copied to clipboard.')),
+    );
+  }
+
+  Future<void> _showReferralShareSheet(PulseUserProfile profile) async {
+    final String shareText = PulseReferral.buildShareText(
+      referralCode: PulseReferral.resolveReferralCode(
+        profile.referralCode,
+        uid: profile.uid,
+      ),
+      displayName: profile.displayName,
+    );
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) {
+        return _ReferralShareSheet(
+          shareText: shareText,
+          onCopy: () async {
+            await Clipboard.setData(ClipboardData(text: shareText));
+
+            if (!sheetContext.mounted) {
+              return;
+            }
+
+            Navigator.of(sheetContext).pop();
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('Referral invite copied to clipboard.'),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<bool> _showDeleteAccountDialog() async {
     final bool? confirmed = await showDialog<bool>(
       context: context,
@@ -338,6 +388,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             }
 
             _initializeForm(profile);
+            final String referralCode = PulseReferral.resolveReferralCode(
+              profile.referralCode,
+              uid: profile.uid,
+            );
+            final String referralCountLabel = profile.referralCount == 1
+                ? '1 referral so far'
+                : '${profile.referralCount} referrals so far';
 
             final String previewName =
                 _displayNameController.text.trim().isNotEmpty
@@ -548,6 +605,76 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         _successMessage = null;
                                       });
                                     },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _ProfileSectionCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text('Referral code', style: textTheme.titleLarge),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Keep this code ready for future Pulse friend joins.',
+                              style: textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 20),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SelectableText(
+                                      referralCode,
+                                      style: textTheme.headlineSmall?.copyWith(
+                                        letterSpacing: 1.2,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      referralCountLabel,
+                                      style: textTheme.bodyMedium,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                OutlinedButton.icon(
+                                  key: const Key(
+                                    'profile-copy-referral-button',
+                                  ),
+                                  onPressed: _isBusy
+                                      ? null
+                                      : () => _copyReferralCode(referralCode),
+                                  icon: const Icon(Icons.copy_rounded),
+                                  label: const Text('Copy code'),
+                                ),
+                                OutlinedButton.icon(
+                                  key: const Key(
+                                    'profile-share-referral-button',
+                                  ),
+                                  onPressed: _isBusy
+                                      ? null
+                                      : () => _showReferralShareSheet(profile),
+                                  icon: const Icon(Icons.share_rounded),
+                                  label: const Text('Share invite'),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -885,6 +1012,75 @@ class _ExportDataSheet extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             FilledButton(onPressed: onCopy, child: const Text('Copy JSON')),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReferralShareSheet extends StatelessWidget {
+  const _ReferralShareSheet({required this.shareText, required this.onCopy});
+
+  final String shareText;
+  final Future<void> Function() onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return FractionallySizedBox(
+      heightFactor: 0.62,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Share your referral',
+              style: textTheme.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Copy this invite text to send your Pulse code anywhere.',
+              style: textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: SelectableText(shareText, style: textTheme.bodyLarge),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: onCopy,
+              child: const Text('Copy invite text'),
+            ),
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: () => Navigator.of(context).pop(),

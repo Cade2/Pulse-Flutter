@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulse_flutter/core/models/pulse_data_export.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
+import 'package:pulse_flutter/core/models/pulse_referral.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/features/swipe_session/models/emotion_card.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
@@ -22,6 +23,8 @@ void main() {
       totalXp: 180,
       currentLevel: 2,
       unlockedBadgeIds: const <String>['first-pulse', 'on-a-roll'],
+      referralCode: PulseReferral.generateReferralCode('test-user'),
+      referralCount: 3,
       settings: const PulseProfileSettings(
         preferredReminderTime: '18:30',
         dailyRemindersEnabled: true,
@@ -80,6 +83,8 @@ void main() {
     expect(json['settings']['weeklySummaryEnabled'], isTrue);
     expect(json['progress']['currentStreak'], 4);
     expect(json['progress']['totalXp'], 180);
+    expect(json['referral']['referralCode'], startsWith('PULSE'));
+    expect(json['referral']['referralCount'], 3);
     expect(json['unlockedBadgeIds'], <dynamic>['first-pulse', 'on-a-roll']);
     expect(json['sessions'], hasLength(1));
     expect(json['sessions'][0]['sessionId'], '2026-04-21');

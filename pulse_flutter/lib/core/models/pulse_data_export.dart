@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pulse_flutter/core/models/pulse_referral.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 
@@ -26,6 +27,15 @@ class PulseDataExport {
         'lastSessionDate': profile.lastSessionDate,
         'totalXp': profile.totalXp,
         'currentLevel': profile.currentLevel,
+      },
+      'referral': <String, Object?>{
+        'referralCode': PulseReferral.resolveReferralCode(
+          profile.referralCode,
+          uid: profile.uid,
+        ),
+        'referralCount': PulseReferral.resolveReferralCount(
+          profile.referralCount,
+        ),
       },
       'unlockedBadgeIds': profile.unlockedBadgeIds,
       'sessions': sessions.map(_sessionToJson).toList(growable: false),

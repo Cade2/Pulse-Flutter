@@ -64,16 +64,9 @@ class InsightsScreen extends ConsumerWidget {
                       else ...[
                         _OverviewCard(report: report),
                         const SizedBox(height: 16),
-                        _ContextBreakdownCard(report: report),
+                        _AcceptedEmotionsChartCard(report: report),
                         const SizedBox(height: 16),
-                        _InsightListCard(
-                          title: 'Top accepted emotions',
-                          items: report.acceptedEmotionFrequency
-                              .take(5)
-                              .toList(growable: false),
-                          emptyMessage:
-                              'No accepted emotions have been saved yet.',
-                        ),
+                        _ContextBreakdownCard(report: report),
                         const SizedBox(height: 16),
                         _InsightListCard(
                           title: 'Most common context tags',
@@ -89,12 +82,7 @@ class InsightsScreen extends ConsumerWidget {
                             children: [
                               _ExpandedPatternsCard(report: report),
                               const SizedBox(height: 16),
-                              _InsightListCard(
-                                title: 'Session rhythm',
-                                items: report.weekdaySessions,
-                                emptyMessage:
-                                    'A weekday rhythm will appear once enough sessions are saved.',
-                              ),
+                              _SessionRhythmChartCard(report: report),
                               const SizedBox(height: 16),
                               _EmotionContextPatternsCard(report: report),
                             ],
@@ -348,8 +336,10 @@ class _OverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final PulseInsightCount? topEmotion = report.topAcceptedEmotion;
-    final PulseInsightCount? topContextTag = report.topContextTag;
     final PulseInsightCount? topWeekday = report.mostActiveWeekday;
+    final String topEmotionShare = _formatPercent(
+      report.acceptedEmotionShare(topEmotion),
+    );
 
     return _InsightsCard(
       child: Column(
@@ -357,33 +347,38 @@ class _OverviewCard extends StatelessWidget {
         children: [
           Text('Overview', style: textTheme.titleLarge),
           const SizedBox(height: 16),
+          _InsightHighlightCard(
+            title: 'Most common mood',
+            value: topEmotion?.label ?? 'No signal yet',
+            supporting: topEmotion == null
+                ? 'Accepted emotions will appear here as your history grows.'
+                : '$topEmotionShare of all accepted emotions so far.',
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _InsightMetricChip(
+                label: 'Accepted total',
+                value: '${report.totalAcceptedEmotions}',
+              ),
+              _InsightMetricChip(
+                label: 'Emotion range',
+                value: '${report.uniqueAcceptedEmotionCount}',
+              ),
+              _InsightMetricChip(
+                label: 'Avg per session',
+                value: _formatAverage(report.averageAcceptedPerSession),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           _InsightRow(
             label: 'Total sessions',
             value: '${report.totalSessions}',
             supporting:
                 '${report.totalAcceptedEmotions} accepted emotions saved',
-          ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Average accepted per session',
-            value: _formatAverage(report.averageAcceptedPerSession),
-            supporting: 'Across your saved Pulse history so far.',
-          ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Top emotion',
-            value: topEmotion?.label ?? 'No signal yet',
-            supporting: topEmotion == null
-                ? 'Accepted emotions will appear here as your history grows.'
-                : '${topEmotion.countText} across saved sessions',
-          ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Most common context',
-            value: topContextTag?.label ?? 'No context yet',
-            supporting: topContextTag == null
-                ? 'Optional context tags will appear here once they are saved.'
-                : topContextTag.countText,
           ),
           const SizedBox(height: 12),
           _InsightRow(
@@ -397,11 +392,6 @@ class _OverviewCard extends StatelessWidget {
       ),
     );
   }
-
-  String _formatAverage(double value) {
-    final bool isWholeNumber = value == value.roundToDouble();
-    return isWholeNumber ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
-  }
 }
 
 class _ContextBreakdownCard extends StatelessWidget {
@@ -412,36 +402,102 @@ class _ContextBreakdownCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final TextTheme textTheme = Theme.of(context).textTheme;
+    final String coverageLabel =
+        '${report.sessionsWithContextTags} / ${report.totalSessions} sessions with context';
+    final double coverageValue = report.contextCoverageFor(
+      report.sessionsWithContextTags,
+    );
 
     return _InsightsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('Context breakdown', style: textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(coverageLabel, style: textTheme.titleMedium),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(value: coverageValue, minHeight: 8),
+          ),
           const SizedBox(height: 16),
-          _InsightRow(
-            label: 'Social context',
-            value: report.topSocialContext?.label ?? 'No social tags yet',
-            supporting:
-                report.topSocialContext?.countText ??
-                'Social context will appear here when it is saved.',
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _ContextSignalTile(
+                label: 'Social',
+                value: report.topSocialContext?.label ?? 'No social tags yet',
+                supporting:
+                    '${report.sessionsWithSocialContext} / ${report.totalSessions} sessions',
+              ),
+              _ContextSignalTile(
+                label: 'Energy',
+                value: report.topEnergyTag?.label ?? 'No energy tags yet',
+                supporting:
+                    '${report.sessionsWithEnergyTag} / ${report.totalSessions} sessions',
+              ),
+              _ContextSignalTile(
+                label: 'Sleep',
+                value: report.topSleepTag?.label ?? 'No sleep tags yet',
+                supporting:
+                    '${report.sessionsWithSleepTag} / ${report.totalSessions} sessions',
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Energy pattern',
-            value: report.topEnergyTag?.label ?? 'No energy tags yet',
-            supporting:
-                report.topEnergyTag?.countText ??
-                'Energy tags will appear here when they are saved.',
+        ],
+      ),
+    );
+  }
+}
+
+class _AcceptedEmotionsChartCard extends StatelessWidget {
+  const _AcceptedEmotionsChartCard({required this.report});
+
+  final PulseInsightsReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final List<PulseInsightCount> items = report.acceptedEmotionFrequency
+        .take(5)
+        .toList(growable: false);
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Top accepted emotions', style: textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            'Emotion mix',
+            style: textTheme.headlineSmall,
           ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Sleep pattern',
-            value: report.topSleepTag?.label ?? 'No sleep tags yet',
-            supporting:
-                report.topSleepTag?.countText ??
-                'Sleep tags will appear here when they are saved.',
+          const SizedBox(height: 8),
+          Text(
+            'A quick view of the emotions you accept most often in Pulse.',
+            style: textTheme.bodyMedium,
           ),
+          const SizedBox(height: 20),
+          if (items.isEmpty)
+            Text(
+              'No accepted emotions have been saved yet.',
+              style: textTheme.bodyMedium,
+            )
+          else
+            ...items.map((item) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: _InsightBarRow(
+                  label: item.label,
+                  count: item.count,
+                  shareLabel: _formatPercent(
+                    report.acceptedEmotionShare(item),
+                  ),
+                  maxCount: items.first.count,
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -493,6 +549,66 @@ class _ExpandedUnlockCard extends StatelessWidget {
   }
 }
 
+class _SessionRhythmChartCard extends StatelessWidget {
+  const _SessionRhythmChartCard({required this.report});
+
+  final PulseInsightsReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final List<String> weekdayOrder = const <String>[
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final Map<String, PulseInsightCount> countsByDay = <String, PulseInsightCount>{
+      for (final PulseInsightCount count in report.weekdaySessions) count.label: count,
+    };
+    final int maxCount = report.weekdaySessions.isEmpty
+        ? 1
+        : report.weekdaySessions.first.count;
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Session rhythm', style: textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            'Weekday pattern',
+            style: textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'See where your saved sessions cluster across the week.',
+            style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 20),
+          ...weekdayOrder.map((day) {
+            final PulseInsightCount? count = countsByDay[day];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _InsightBarRow(
+                label: day,
+                count: count?.count ?? 0,
+                shareLabel: count == null
+                    ? '0%'
+                    : _formatPercent(report.weekdayShare(count)),
+                maxCount: maxCount,
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
 class _ExpandedPatternsCard extends StatelessWidget {
   const _ExpandedPatternsCard({required this.report});
 
@@ -503,6 +619,15 @@ class _ExpandedPatternsCard extends StatelessWidget {
     final TextTheme textTheme = Theme.of(context).textTheme;
     final PulseInsightCount? topWeekday = report.mostActiveWeekday;
     final PulseInsightPattern? topPattern = report.topEmotionContextPattern;
+    final String weekdayShare = _formatPercent(report.weekdayShare(topWeekday));
+    final String emotionShare = _formatPercent(
+      report.acceptedEmotionShare(report.topAcceptedEmotion),
+    );
+    final String contextAnchor = [
+      report.topSocialContext?.label,
+      report.topEnergyTag?.label,
+      report.topSleepTag?.label,
+    ].whereType<String>().join(' / ');
 
     return _InsightsCard(
       child: Column(
@@ -510,53 +635,44 @@ class _ExpandedPatternsCard extends StatelessWidget {
         children: [
           Text('Pattern signals', style: textTheme.titleLarge),
           const SizedBox(height: 16),
-          _InsightRow(
-            label: 'Average accepted per session',
-            value: _formatAverage(report.averageAcceptedPerSession),
-            supporting: 'Based on your saved Pulse history.',
-          ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Most active weekday',
-            value: topWeekday?.label ?? 'No weekday signal yet',
-            supporting: topWeekday?.countText ?? '',
-          ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Most common social context',
-            value: report.topSocialContext?.label ?? 'No social tags yet',
-            supporting: report.topSocialContext?.countText ?? '',
-          ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Most common energy',
-            value: report.topEnergyTag?.label ?? 'No energy tags yet',
-            supporting: report.topEnergyTag?.countText ?? '',
-          ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Most common sleep',
-            value: report.topSleepTag?.label ?? 'No sleep tags yet',
-            supporting: report.topSleepTag?.countText ?? '',
-          ),
-          const SizedBox(height: 12),
-          _InsightRow(
-            label: 'Strongest emotion + context signal',
-            value: topPattern == null
-                ? 'No paired signal yet'
-                : '${topPattern.emotion} + ${topPattern.contextTag}',
-            supporting:
-                topPattern?.countText ??
-                'A repeated emotion + context signal will appear here when enough context is saved.',
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _PatternSignalTile(
+                title: 'Weekly rhythm',
+                value: topWeekday?.label ?? 'No weekday signal yet',
+                supporting: topWeekday == null
+                    ? 'A clearer rhythm will appear as more history is saved.'
+                    : '$weekdayShare of sessions land here across ${report.activeWeekdayCount} active weekdays.',
+              ),
+              _PatternSignalTile(
+                title: 'Recurring signal',
+                value: topPattern == null
+                    ? 'No paired signal yet'
+                    : '${topPattern.emotion} + ${topPattern.contextTag}',
+                supporting:
+                    topPattern?.countText ??
+                    'A repeated emotion + context pattern will appear once enough context is saved.',
+              ),
+              _PatternSignalTile(
+                title: 'Emotion range',
+                value: '${report.uniqueAcceptedEmotionCount} accepted emotions',
+                supporting:
+                    '${_formatAverage(report.averageAcceptedPerSession)} accepted per session on average, with $emotionShare leaning toward ${report.topAcceptedEmotion?.label ?? 'your top emotion'}.',
+              ),
+              _PatternSignalTile(
+                title: 'Context anchors',
+                value: contextAnchor.isEmpty ? 'No strong context yet' : contextAnchor,
+                supporting: contextAnchor.isEmpty
+                    ? 'Saved social, energy, and sleep tags will combine here.'
+                    : 'Most common social, energy, and sleep signals so far.',
+              ),
+            ],
           ),
         ],
       ),
     );
-  }
-
-  String _formatAverage(double value) {
-    final bool isWholeNumber = value == value.roundToDouble();
-    return isWholeNumber ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
   }
 }
 
@@ -639,6 +755,214 @@ class _InsightListCard extends StatelessWidget {
             }),
         ],
       ),
+    );
+  }
+}
+
+class _InsightHighlightCard extends StatelessWidget {
+  const _InsightHighlightCard({
+    required this.title,
+    required this.value,
+    required this.supporting,
+  });
+
+  final String title;
+  final String value;
+  final String supporting;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(value, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 8),
+            Text(supporting, style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InsightMetricChip extends StatelessWidget {
+  const _InsightMetricChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(value, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(width: 8),
+            Text(label, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContextSignalTile extends StatelessWidget {
+  const _ContextSignalTile({
+    required this.label,
+    required this.value,
+    required this.supporting,
+  });
+
+  final String label;
+  final String value;
+  final String supporting;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 148, maxWidth: 220),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 10),
+              Text(value, style: Theme.of(context).textTheme.bodyLarge),
+              const SizedBox(height: 8),
+              Text(supporting, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PatternSignalTile extends StatelessWidget {
+  const _PatternSignalTile({
+    required this.title,
+    required this.value,
+    required this.supporting,
+  });
+
+  final String title;
+  final String value;
+  final String supporting;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 220, maxWidth: 248),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 10),
+              Text(value, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(supporting, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InsightBarRow extends StatelessWidget {
+  const _InsightBarRow({
+    required this.label,
+    required this.count,
+    required this.shareLabel,
+    required this.maxCount,
+  });
+
+  final String label;
+  final int count;
+  final String shareLabel;
+  final int maxCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final double fillRatio = maxCount <= 0 ? 0 : count / maxCount;
+    final ThemeData theme = Theme.of(context);
+    final TextTheme textTheme = theme.textTheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availableWidth = constraints.maxWidth - 96;
+        final double clampedWidth = availableWidth > 0 ? availableWidth : 0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(label, style: textTheme.bodyLarge)),
+                const SizedBox(width: 12),
+                Text(
+                  '$count',
+                  style: textTheme.titleMedium,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  shareLabel,
+                  style: textTheme.bodySmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Stack(
+              children: [
+                Container(
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                Container(
+                  width: clampedWidth * fillRatio,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -763,4 +1087,14 @@ class _InsightRow extends StatelessWidget {
       ],
     );
   }
+}
+
+String _formatAverage(double value) {
+  final bool isWholeNumber = value == value.roundToDouble();
+  return isWholeNumber ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+}
+
+String _formatPercent(double value) {
+  final int percent = (value * 100).round();
+  return '$percent%';
 }

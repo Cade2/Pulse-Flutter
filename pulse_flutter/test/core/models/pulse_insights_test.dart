@@ -26,8 +26,10 @@ void main() {
     expect(report.availability, PulseInsightsAvailability.locked);
     expect(report.totalSessions, 3);
     expect(report.sessionsUntilBasic, 2);
+    expect(report.uniqueAcceptedEmotionCount, 3);
     expect(report.topAcceptedEmotion?.label, 'Calm');
     expect(report.topAcceptedEmotion?.count, 2);
+    expect(report.acceptedEmotionShare(report.topAcceptedEmotion), 0.5);
     expect(report.currentWeekScore.score, 86);
     expect(report.weeklyScoreTrend, isNull);
   });
@@ -70,12 +72,22 @@ void main() {
 
     expect(report.availability, PulseInsightsAvailability.basic);
     expect(report.sessionsUntilExpanded, 9);
+    expect(report.sessionsWithContextTags, 5);
+    expect(report.sessionsWithSocialContext, 4);
+    expect(report.sessionsWithEnergyTag, 3);
+    expect(report.sessionsWithSleepTag, 2);
+    expect(report.uniqueAcceptedEmotionCount, 4);
     expect(report.topAcceptedEmotion?.label, 'Calm');
     expect(report.topAcceptedEmotion?.count, 3);
+    expect(
+      report.acceptedEmotionShare(report.topAcceptedEmotion),
+      closeTo(3 / 7, 0.0001),
+    );
     expect(report.topContextTag?.label, 'Social: Friends');
     expect(report.topContextTag?.count, 4);
     expect(report.mostActiveWeekday?.label, 'Wednesday');
     expect(report.mostActiveWeekday?.count, 3);
+    expect(report.weekdayShare(report.mostActiveWeekday), closeTo(3 / 5, 0.0001));
     expect(report.topSocialContext?.label, 'Friends');
     expect(report.topEnergyTag?.label, 'Steady');
     expect(report.topSleepTag?.label, 'Good');
@@ -116,12 +128,19 @@ void main() {
 
       expect(report.availability, PulseInsightsAvailability.expanded);
       expect(report.totalSessions, 14);
+      expect(report.sessionsWithContextTags, 14);
+      expect(report.activeWeekdayCount, 7);
       expect(report.topAcceptedEmotion?.label, 'Calm');
       expect(report.topAcceptedEmotion?.count, 14);
+      expect(
+        report.acceptedEmotionShare(report.topAcceptedEmotion),
+        closeTo(14 / 23, 0.0001),
+      );
       expect(report.topSocialContext?.label, 'Friends');
       expect(report.topEnergyTag?.label, 'Steady');
       expect(report.topSleepTag?.label, 'Good');
       expect(report.weekdaySessions, isNotEmpty);
+      expect(report.weekdayShare(report.mostActiveWeekday), closeTo(2 / 14, 0.0001));
       expect(report.topEmotionContextPattern?.emotion, 'Calm');
       expect(report.topEmotionContextPattern?.contextTag, 'Energy: Steady');
       expect(report.topEmotionContextPattern?.count, 9);

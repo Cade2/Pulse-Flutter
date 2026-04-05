@@ -33,6 +33,10 @@ class PulseInsightsReport {
   const PulseInsightsReport({
     this.totalSessions = 0,
     this.totalAcceptedEmotions = 0,
+    this.sessionsWithContextTags = 0,
+    this.sessionsWithSocialContext = 0,
+    this.sessionsWithEnergyTag = 0,
+    this.sessionsWithSleepTag = 0,
     this.acceptedEmotionFrequency = const <PulseInsightCount>[],
     this.commonContextTags = const <PulseInsightCount>[],
     this.socialContexts = const <PulseInsightCount>[],
@@ -46,6 +50,10 @@ class PulseInsightsReport {
 
   final int totalSessions;
   final int totalAcceptedEmotions;
+  final int sessionsWithContextTags;
+  final int sessionsWithSocialContext;
+  final int sessionsWithEnergyTag;
+  final int sessionsWithSleepTag;
   final List<PulseInsightCount> acceptedEmotionFrequency;
   final List<PulseInsightCount> commonContextTags;
   final List<PulseInsightCount> socialContexts;
@@ -98,6 +106,18 @@ class PulseInsightsReport {
         0,
         (sum, session) => sum + session.acceptedEmotions.length,
       ),
+      sessionsWithContextTags: sessions
+          .where((session) => session.contextTags.isNotEmpty)
+          .length,
+      sessionsWithSocialContext: sessions
+          .where((session) => (session.contextSocial?.trim().isNotEmpty ?? false))
+          .length,
+      sessionsWithEnergyTag: sessions
+          .where((session) => (session.contextEnergy?.trim().isNotEmpty ?? false))
+          .length,
+      sessionsWithSleepTag: sessions
+          .where((session) => (session.contextSleep?.trim().isNotEmpty ?? false))
+          .length,
       acceptedEmotionFrequency: acceptedEmotionFrequency,
       commonContextTags: commonContextTags,
       socialContexts: socialContexts,
@@ -138,6 +158,34 @@ class PulseInsightsReport {
     }
 
     return totalAcceptedEmotions / totalSessions;
+  }
+
+  int get uniqueAcceptedEmotionCount => acceptedEmotionFrequency.length;
+
+  int get activeWeekdayCount => weekdaySessions.length;
+
+  double acceptedEmotionShare(PulseInsightCount? count) {
+    if (count == null || totalAcceptedEmotions == 0) {
+      return 0;
+    }
+
+    return count.count / totalAcceptedEmotions;
+  }
+
+  double contextCoverageFor(int sessionsWithValue) {
+    if (totalSessions == 0) {
+      return 0;
+    }
+
+    return sessionsWithValue / totalSessions;
+  }
+
+  double weekdayShare(PulseInsightCount? count) {
+    if (count == null || totalSessions == 0) {
+      return 0;
+    }
+
+    return count.count / totalSessions;
   }
 
   PulseInsightCount? get topAcceptedEmotion {

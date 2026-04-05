@@ -28,16 +28,14 @@ abstract class SwipeSessionRepository {
   Stream<List<SwipeSessionRecord>> watchSessions({required String uid});
 }
 
-abstract class RemoteSwipeSessionRepository
-    implements SwipeSessionRepository {
+abstract class RemoteSwipeSessionRepository implements SwipeSessionRepository {
   Future<SwipeSessionSaveResult> saveRecord({
     required String uid,
     required SwipeSessionRecord record,
   });
 }
 
-class FirestoreSwipeSessionRepository
-    implements RemoteSwipeSessionRepository {
+class FirestoreSwipeSessionRepository implements RemoteSwipeSessionRepository {
   const FirestoreSwipeSessionRepository(this._firestore);
 
   final FirebaseFirestore _firestore;
@@ -70,6 +68,7 @@ class FirestoreSwipeSessionRepository
         await _readSessionHistory(uid);
     final PulseSessionHistoryEntry pendingSession = PulseSessionHistoryEntry(
       date: record.sessionId,
+      acceptedEmotions: record.acceptedEmotions,
       contextSocial: record.contextSocial,
       contextEnergy: record.contextEnergy,
       contextSleep: record.contextSleep,
@@ -231,8 +230,8 @@ class FirestoreSwipeSessionRepository
     PulseLevelProgress levelProgress,
   ) {
     return PulseBadgeCatalog.unlockedBadgeIds(
-      PulseBadgeProgressSnapshot(
-        sessionCount: sessionHistory.length,
+      PulseBadgeProgressSnapshot.fromSessionHistory(
+        sessionHistory: sessionHistory,
         longestStreak: streak.longestStreak,
         currentLevel: levelProgress.currentLevel,
       ),
@@ -303,7 +302,8 @@ class OfflineFirstSwipeSessionRepository implements SwipeSessionRepository {
       contextSleep: contextSleep,
     );
 
-    final bool isOffline = !(await _connectivityService.currentState()).isOnline;
+    final bool isOffline =
+        !(await _connectivityService.currentState()).isOnline;
     if (isOffline) {
       return _queuePendingSession(uid: uid, record: record);
     }
@@ -313,7 +313,10 @@ class OfflineFirstSwipeSessionRepository implements SwipeSessionRepository {
         uid: uid,
         record: record,
       );
-      await _database.removePendingSession(uid: uid, sessionId: record.sessionId);
+      await _database.removePendingSession(
+        uid: uid,
+        sessionId: record.sessionId,
+      );
       return result;
     } on FirebaseException catch (error) {
       if (_isOfflineFailure(error)) {

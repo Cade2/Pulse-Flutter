@@ -37,10 +37,10 @@ void main() {
 
     expect(reward.didLevelUp, isTrue);
     expect(reward.levelsGained, 1);
-    expect(reward.newlyUnlockedBadgeIds, <String>[
-      'on-a-roll',
-      'seven-check-ins',
-    ]);
+    expect(
+      reward.newlyUnlockedBadgeIds,
+      unorderedEquals(<String>['on-a-roll', 'seven-check-ins']),
+    );
     expect(
       reward.streakMilestoneMessage,
       'Streak milestone reached: 3 days in a row.',

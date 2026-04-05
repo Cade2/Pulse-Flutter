@@ -154,10 +154,8 @@ class UserProfileRepository {
     final bool settingsNeedWriteback = PulseProfileSettings.needsRepair(
       data['settings'],
     );
-    final bool referralCodeNeedsWriteback = PulseReferral.needsReferralCodeRepair(
-      data['referralCode'],
-      uid: uid,
-    );
+    final bool referralCodeNeedsWriteback =
+        PulseReferral.needsReferralCodeRepair(data['referralCode'], uid: uid);
     final bool referralCountNeedsWriteback =
         PulseReferral.needsReferralCountRepair(data['referralCount']);
 
@@ -175,7 +173,8 @@ class UserProfileRepository {
         if (avatarNeedsWriteback) 'avatarColour': profile.avatarColour,
         if (settingsNeedWriteback) 'settings': reconciledSettings.toFirestore(),
         if (referralCodeNeedsWriteback) 'referralCode': reconciledReferralCode,
-        if (referralCountNeedsWriteback) 'referralCount': reconciledReferralCount,
+        if (referralCountNeedsWriteback)
+          'referralCount': reconciledReferralCount,
       }, SetOptions(merge: true));
     }
 
@@ -239,8 +238,8 @@ class UserProfileRepository {
     required PulseLevelProgress levelProgress,
   }) {
     return PulseBadgeCatalog.unlockedBadgeIds(
-      PulseBadgeProgressSnapshot(
-        sessionCount: sessionHistory.length,
+      PulseBadgeProgressSnapshot.fromSessionHistory(
+        sessionHistory: sessionHistory,
         longestStreak: streak.longestStreak,
         currentLevel: levelProgress.currentLevel,
       ),

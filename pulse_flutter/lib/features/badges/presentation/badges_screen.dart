@@ -37,6 +37,7 @@ class BadgesScreen extends ConsumerWidget {
                       _BadgeSummaryCard(
                         unlockedCount: unlocked.length,
                         totalCount: statuses.length,
+                        lockedCount: locked.length,
                       ),
                       const SizedBox(height: 24),
                       Text('Unlocked badges', style: textTheme.titleLarge),
@@ -106,10 +107,12 @@ class _BadgeSummaryCard extends StatelessWidget {
   const _BadgeSummaryCard({
     required this.unlockedCount,
     required this.totalCount,
+    required this.lockedCount,
   });
 
   final int unlockedCount;
   final int totalCount;
+  final int lockedCount;
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +137,7 @@ class _BadgeSummaryCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Badges unlock from the streak, level, and session history you already build in Pulse.',
+              '$lockedCount more badges are waiting on the session, streak, growth, emotion, and context data you already build in Pulse.',
               style: textTheme.bodyMedium,
             ),
           ],
@@ -180,6 +183,9 @@ class _BadgeCard extends StatelessWidget {
     final Color accentColor = status.isUnlocked
         ? theme.colorScheme.primary
         : theme.colorScheme.outline;
+    final Color categoryChipColor = status.isUnlocked
+        ? theme.colorScheme.primary
+        : theme.colorScheme.secondary;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -206,6 +212,11 @@ class _BadgeCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _BadgeCategoryChip(
+                    label: status.categoryLabel,
+                    color: categoryChipColor,
+                  ),
+                  const SizedBox(height: 10),
                   Text(status.definition.title, style: textTheme.titleMedium),
                   const SizedBox(height: 6),
                   Text(
@@ -213,14 +224,56 @@ class _BadgeCard extends StatelessWidget {
                     style: textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 10),
+                  if (!status.isUnlocked) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        minHeight: 8,
+                        value: status.progressRatio,
+                        backgroundColor: theme.colorScheme.surfaceContainer,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   Text(
-                    status.hintText,
+                    status.progressText,
                     style: textTheme.bodySmall?.copyWith(color: accentColor),
                   ),
+                  const SizedBox(height: 4),
+                  Text(status.hintText, style: textTheme.bodySmall),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BadgeCategoryChip extends StatelessWidget {
+  const _BadgeCategoryChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(color: color),
         ),
       ),
     );

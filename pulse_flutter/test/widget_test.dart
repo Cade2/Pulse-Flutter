@@ -18,6 +18,7 @@ import 'package:pulse_flutter/core/models/pulse_insights.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/pulse_referral.dart';
+import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/notifications/pulse_firebase_messaging_service.dart';
@@ -78,14 +79,10 @@ void main() {
       final StreamController<PulseUserProfile?> profileController =
           StreamController<PulseUserProfile?>.broadcast();
       addTearDown(profileController.close);
-      final _FakeFirebaseAuthService fakeAuthService =
-          _FakeFirebaseAuthService()
-            ..googleSignInException = PulseSocialAuthException.unavailable(
-              'Google',
-            )
-            ..appleSignInException = PulseSocialAuthException.unavailable(
-              'Apple',
-            );
+      final _FakeFirebaseAuthService
+      fakeAuthService = _FakeFirebaseAuthService()
+        ..googleSignInException = PulseSocialAuthException.unavailable('Google')
+        ..appleSignInException = PulseSocialAuthException.unavailable('Apple');
       final _FakeUserProfileRepository fakeUserProfileRepository =
           _FakeUserProfileRepository(
             initialProfile: _buildProfile(email: 'tester@example.com'),
@@ -245,7 +242,9 @@ void main() {
             currentUserLevelProgressProvider.overrideWith(
               (ref) => const PulseLevelProgress(totalXp: 180, currentLevel: 2),
             ),
-            swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+            swipeSessionRepositoryProvider.overrideWith(
+              (ref) => fakeRepository,
+            ),
             pulseMessagingServiceProvider.overrideWithValue(messagingService),
             pulsePushNotificationTapSourceProvider.overrideWithValue(
               notificationTapSource,
@@ -484,16 +483,15 @@ void main() {
 
     expect(find.text('Share your referral'), findsOneWidget);
     expect(find.text('Copy invite text'), findsOneWidget);
-    expect(
-      find.textContaining('Referral code: $referralCode'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Referral code: $referralCode'), findsOneWidget);
   });
 
   testWidgets(
     'friends leaderboard screen is reachable from profile and shows empty state',
     (WidgetTester tester) async {
-      final String referralCode = PulseReferral.generateReferralCode('test-user');
+      final String referralCode = PulseReferral.generateReferralCode(
+        'test-user',
+      );
 
       await tester.pumpWidget(
         ProviderScope(
@@ -711,7 +709,9 @@ void main() {
                 ),
               ),
             ),
-            currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+            currentUserStreakProvider.overrideWith(
+              (ref) => const PulseStreak(),
+            ),
             currentUserLevelProgressProvider.overrideWith(
               (ref) => const PulseLevelProgress(),
             ),
@@ -730,7 +730,9 @@ void main() {
       await tester.tap(find.text('Profile').last);
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.byKey(const Key('profile-delete-account-button')));
+      await tester.ensureVisible(
+        find.byKey(const Key('profile-delete-account-button')),
+      );
       await tester.tap(find.byKey(const Key('profile-delete-account-button')));
       await tester.pumpAndSettle();
 
@@ -829,8 +831,14 @@ void main() {
     expect(find.text('On A Roll'), findsOneWidget);
     expect(find.text('Level Up'), findsOneWidget);
     expect(find.text('Seven Check-Ins'), findsOneWidget);
+    expect(find.text('Fortnight Reflections'), findsOneWidget);
+    expect(find.text('Emotion Cartographer'), findsOneWidget);
+    expect(find.text('Context Curious'), findsOneWidget);
     expect(find.text('1 / 7 sessions'), findsOneWidget);
     expect(find.text('Level 1 / 2'), findsOneWidget);
+    expect(find.text('0 / 5 sessions with context'), findsOneWidget);
+    expect(find.text('1 / 7 unique emotions'), findsOneWidget);
+    expect(find.text('Add context tags in 5 more sessions.'), findsOneWidget);
     expect(find.text('Unlocked'), findsNWidgets(2));
   });
 
@@ -1571,7 +1579,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('level-up-celebration-dialog')), findsNothing);
+      expect(
+        find.byKey(const Key('level-up-celebration-dialog')),
+        findsNothing,
+      );
       expect(
         find.byKey(const Key('badge-unlock-celebration-dialog')),
         findsNothing,
@@ -1591,7 +1602,7 @@ void main() {
       expect(fakeRepository.lastSaveResult?.reward.didLevelUp, isTrue);
       expect(
         fakeRepository.lastSaveResult?.reward.newlyUnlockedBadgeIds,
-        <String>['on-a-roll', 'seven-check-ins'],
+        unorderedEquals(<String>['on-a-roll', 'seven-check-ins']),
       );
     },
   );
@@ -2294,8 +2305,16 @@ class _FakeSwipeSessionRepository implements SwipeSessionRepository {
     PulseLevelProgress levelProgress,
   ) {
     return PulseBadgeCatalog.unlockedBadgeIds(
-      PulseBadgeProgressSnapshot(
-        sessionCount: sessions.length,
+      PulseBadgeProgressSnapshot.fromSessionHistory(
+        sessionHistory: sessions.map((session) {
+          return PulseSessionHistoryEntry(
+            date: session.date,
+            acceptedEmotions: session.acceptedEmotions,
+            contextSocial: session.contextSocial,
+            contextEnergy: session.contextEnergy,
+            contextSleep: session.contextSleep,
+          );
+        }),
         longestStreak: streak.longestStreak,
         currentLevel: levelProgress.currentLevel,
       ),

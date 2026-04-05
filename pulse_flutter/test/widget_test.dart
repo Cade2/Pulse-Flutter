@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/app/router.dart';
+import 'package:pulse_flutter/core/firebase/firebase_auth_service.dart';
+import 'package:pulse_flutter/core/firestore/pulse_account_repository.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
 import 'package:pulse_flutter/core/firestore/user_profile_repository.dart';
 import 'package:pulse_flutter/core/models/pulse_badge.dart';
@@ -20,6 +22,7 @@ import 'package:pulse_flutter/core/notifications/pulse_firebase_messaging_servic
 import 'package:pulse_flutter/core/notifications/pulse_local_notification_service.dart';
 import 'package:pulse_flutter/core/notifications/pulse_push_message.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/account_providers.dart';
 import 'package:pulse_flutter/core/providers/messaging_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -480,6 +483,85 @@ void main() {
     expect(find.textContaining('"uid": "test-user"'), findsOneWidget);
     expect(find.textContaining('"sessionId": "2026-04-21"'), findsOneWidget);
   });
+
+  testWidgets(
+    'delete account requires DELETE and removes Pulse data before sign out',
+    (WidgetTester tester) async {
+      final _FakePulseAccountRepository fakeAccountRepository =
+          _FakePulseAccountRepository();
+      final _FakeFirebaseAuthService fakeAuthService =
+          _FakeFirebaseAuthService();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => 'test-user'),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            currentUserProfileProvider.overrideWith(
+              (ref) => Stream.value(
+                _buildProfile(
+                  displayName: 'Ava',
+                  email: 'ava@example.com',
+                  avatarColour: '#EC4899',
+                ),
+              ),
+            ),
+            currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+            currentUserLevelProgressProvider.overrideWith(
+              (ref) => const PulseLevelProgress(),
+            ),
+            pulseAccountRepositoryProvider.overrideWithValue(
+              fakeAccountRepository,
+            ),
+            firebaseAuthServiceProvider.overrideWithValue(fakeAuthService),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Profile'));
+      await tester.tap(find.text('Profile').last);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const Key('profile-delete-account-button')));
+      await tester.tap(find.byKey(const Key('profile-delete-account-button')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('delete-account-confirm-button')),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('delete-account-confirmation-input')),
+        'DELETE',
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('delete-account-confirm-button')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await tester.tap(find.byKey(const Key('delete-account-confirm-button')));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(fakeAccountRepository.deletedUid, 'test-user');
+      expect(fakeAuthService.signOutCalled, isTrue);
+    },
+  );
 
   testWidgets('badge screen is reachable from profile and shows progress', (
     WidgetTester tester,
@@ -1614,6 +1696,51 @@ class _FakeWidgetNotificationTapSource
 
   Future<void> dispose() async {
     await tapController.close();
+  }
+}
+
+class _FakeFirebaseAuthService implements FirebaseAuthService {
+  bool signOutCalled = false;
+
+  @override
+  User? get currentUser => null;
+
+  @override
+  Stream<User?> authStateChanges() {
+    return const Stream<User?>.empty();
+  }
+
+  @override
+  Future<UserCredential> createUserWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  bool get isAuthenticated => false;
+
+  @override
+  Future<UserCredential> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> signOut() async {
+    signOutCalled = true;
+  }
+}
+
+class _FakePulseAccountRepository implements PulseAccountRepository {
+  String? deletedUid;
+
+  @override
+  Future<void> deleteUserData(String uid) async {
+    deletedUid = uid;
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:pulse_flutter/components/pulse_avatar.dart';
 import 'package:pulse_flutter/core/models/pulse_data_export.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
+import 'package:pulse_flutter/core/providers/account_providers.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -34,8 +35,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   PulseAppearanceMode _appearanceMode =
       PulseProfileSettings.defaultAppearanceMode;
   bool _isExporting = false;
+  bool _isDeletingAccount = false;
   String? _errorMessage;
   String? _successMessage;
+
+  bool get _isBusy => _isSaving || _isExporting || _isDeletingAccount;
 
   @override
   void dispose() {
@@ -217,6 +221,57 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Future<bool> _showDeleteAccountDialog() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => const _DeleteAccountDialog(),
+    );
+
+    return confirmed ?? false;
+  }
+
+  Future<void> _deleteAccount() async {
+    final String? uid = ref.read(currentUserIdProvider);
+    if (uid == null || uid.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please sign in again before deleting your account.';
+        _successMessage = null;
+      });
+      return;
+    }
+
+    final bool confirmed = await _showDeleteAccountDialog();
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isDeletingAccount = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      await ref.read(pulseAccountRepositoryProvider).deleteUserData(uid);
+      await ref.read(firebaseAuthServiceProvider).signOut();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _errorMessage =
+            'We could not delete your Pulse data right now. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeletingAccount = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final AsyncValue<PulseUserProfile?> profileAsync = ref.watch(
@@ -230,6 +285,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: profileAsync.when(
           data: (profile) {
             if (profile == null) {
+              final String headline = _errorMessage == null
+                  ? 'Profile unavailable'
+                  : 'Account deletion incomplete';
+              final String body = _errorMessage ??
+                  'Your Pulse profile is not ready yet. Please try again in a moment.';
+
+              if (_isDeletingAccount) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 20),
+                        Text(
+                          'Deleting your Pulse data...',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
               return Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
@@ -240,13 +320,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Profile unavailable',
+                          headline,
                           style: textTheme.headlineLarge,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Your Pulse profile is not ready yet. Please try again in a moment.',
+                          body,
                           style: textTheme.bodyLarge,
                           textAlign: TextAlign.center,
                         ),
@@ -305,6 +385,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             TextField(
                               controller: _displayNameController,
                               textInputAction: TextInputAction.done,
+                              enabled: !_isBusy,
                               decoration: const InputDecoration(
                                 labelText: 'Display name',
                                 hintText: 'How Pulse should greet you',
@@ -329,7 +410,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         PulseUserProfile.colorFromHex(color);
 
                                     return InkWell(
-                                      onTap: _isSaving
+                                      onTap: _isBusy
                                           ? null
                                           : () {
                                               setState(() {
@@ -382,7 +463,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             ),
                             const SizedBox(height: 12),
                             OutlinedButton.icon(
-                              onPressed: _isSaving ? null : _pickReminderTime,
+                              onPressed: _isBusy ? null : _pickReminderTime,
                               icon: const Icon(Icons.schedule_rounded),
                               label: Text(
                                 PulseProfileSettings.formatDisplayTime(
@@ -400,7 +481,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 'Keep a daily Pulse check-in reminder ready.',
                               ),
                               value: _dailyRemindersEnabled,
-                              onChanged: _isSaving
+                              onChanged: _isBusy
                                   ? null
                                   : (value) {
                                       setState(() {
@@ -416,7 +497,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 'Highlight when your streak could use a nudge.',
                               ),
                               value: _streakRemindersEnabled,
-                              onChanged: _isSaving
+                              onChanged: _isBusy
                                   ? null
                                   : (value) {
                                       setState(() {
@@ -432,7 +513,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 'Save a spot for future weekly Pulse recaps.',
                               ),
                               value: _weeklySummaryEnabled,
-                              onChanged: _isSaving
+                              onChanged: _isBusy
                                   ? null
                                   : (value) {
                                       setState(() {
@@ -455,7 +536,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   })
                                   .toList(growable: false),
                               selected: <PulseAppearanceMode>{_appearanceMode},
-                              onSelectionChanged: _isSaving
+                              onSelectionChanged: _isBusy
                                   ? null
                                   : (selection) {
                                       if (selection.isEmpty) {
@@ -497,9 +578,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                       const SizedBox(height: 32),
                       FilledButton(
-                        onPressed: (_isSaving || _isExporting)
-                            ? null
-                            : _saveProfile,
+                        onPressed: _isBusy ? null : _saveProfile,
                         child: _isSaving
                             ? const SizedBox(
                                 height: 20,
@@ -512,14 +591,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton(
-                        onPressed: () => context.goNamed(AppRoutes.badgesName),
+                        onPressed: _isBusy
+                            ? null
+                            : () => context.goNamed(AppRoutes.badgesName),
                         child: const Text('View badges'),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: (_isSaving || _isExporting)
-                            ? null
-                            : () => _exportData(profile),
+                        onPressed: _isBusy ? null : () => _exportData(profile),
                         icon: _isExporting
                             ? const SizedBox(
                                 height: 18,
@@ -533,6 +612,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           _isExporting
                               ? 'Preparing export...'
                               : 'Export my data',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _ProfileSectionCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Delete account',
+                              style: textTheme.titleLarge?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'This removes your Pulse profile, saved sessions, progress, badges, settings, and stored messaging data from Firestore, then signs you out.',
+                              style: textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Type DELETE to confirm before the action can proceed.',
+                              style: textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              key: const Key('profile-delete-account-button'),
+                              onPressed: _isBusy ? null : _deleteAccount,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.error,
+                              ),
+                              icon: _isDeletingAccount
+                                  ? const SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.delete_forever_rounded),
+                              label: Text(
+                                _isDeletingAccount
+                                    ? 'Deleting account...'
+                                    : 'Delete account',
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -571,6 +698,81 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           },
         ),
       ),
+    );
+  }
+}
+
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  bool get _canDelete => _controller.text.trim() == 'DELETE';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_handleChanged);
+  }
+
+  @override
+  void dispose() {
+    _controller
+      ..removeListener(_handleChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleChanged() {
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Delete your Pulse account?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'This permanently deletes your Pulse-owned data from Firestore and signs you out.',
+          ),
+          const SizedBox(height: 12),
+          const Text('Type DELETE to confirm.'),
+          const SizedBox(height: 16),
+          TextField(
+            key: const Key('delete-account-confirmation-input'),
+            controller: _controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              labelText: 'Confirmation',
+              hintText: 'DELETE',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('delete-account-confirm-button'),
+          onPressed: _canDelete ? () => Navigator.of(context).pop(true) : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
+          ),
+          child: const Text('Delete Pulse account'),
+        ),
+      ],
     );
   }
 }

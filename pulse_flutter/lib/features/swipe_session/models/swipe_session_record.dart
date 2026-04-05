@@ -106,6 +106,44 @@ class SwipeSessionRecord {
     };
   }
 
+  Map<String, Object?> toLocalJson() {
+    return <String, Object?>{
+      'sessionId': sessionId,
+      'date': date,
+      'completedAt': completedAt.toIso8601String(),
+      'swipes': responses
+          .map(
+            (response) => <String, String>{
+              'emotionId': response.card.id,
+              'emotionTitle': response.card.title,
+              'decision': response.decision.name,
+            },
+          )
+          .toList(growable: false),
+      'acceptedEmotions': acceptedEmotions,
+      'contextSocial': contextSocial,
+      'contextEnergy': contextEnergy,
+      'contextSleep': contextSleep,
+    };
+  }
+
+  factory SwipeSessionRecord.fromLocalJson(Map<String, dynamic> data) {
+    final List<EmotionCardResponse> responses = _readResponses(data['swipes']);
+    final DateTime completedAt =
+        _readIsoDate(data['completedAt']) ?? DateTime.now();
+
+    return SwipeSessionRecord(
+      sessionId: _readString(data['sessionId']) ?? sessionIdForDate(completedAt),
+      date: _readString(data['date']) ?? _formatDate(completedAt),
+      completedAt: completedAt,
+      responses: responses,
+      acceptedEmotions: _readStringList(data['acceptedEmotions']),
+      contextSocial: _readString(data['contextSocial']),
+      contextEnergy: _readString(data['contextEnergy']),
+      contextSleep: _readString(data['contextSleep']),
+    );
+  }
+
   static String sessionIdForDate(DateTime value) {
     return _formatDate(value);
   }
@@ -140,6 +178,14 @@ class SwipeSessionRecord {
     }
 
     return null;
+  }
+
+  static DateTime? _readIsoDate(Object? value) {
+    if (value is! String) {
+      return null;
+    }
+
+    return DateTime.tryParse(value);
   }
 
   static List<String> _readStringList(Object? value) {

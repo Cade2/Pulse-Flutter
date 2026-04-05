@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pulse_flutter/core/connectivity/pulse_connectivity_service.dart';
+import 'package:pulse_flutter/core/database/pulse_app_database.dart';
 import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
+import 'package:pulse_flutter/features/swipe_session/models/pending_swipe_session.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_reward_details.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
@@ -25,7 +28,16 @@ abstract class SwipeSessionRepository {
   Stream<List<SwipeSessionRecord>> watchSessions({required String uid});
 }
 
-class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
+abstract class RemoteSwipeSessionRepository
+    implements SwipeSessionRepository {
+  Future<SwipeSessionSaveResult> saveRecord({
+    required String uid,
+    required SwipeSessionRecord record,
+  });
+}
+
+class FirestoreSwipeSessionRepository
+    implements RemoteSwipeSessionRepository {
   const FirestoreSwipeSessionRepository(this._firestore);
 
   final FirebaseFirestore _firestore;
@@ -37,20 +49,30 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
     String? contextSocial,
     String? contextEnergy,
     String? contextSleep,
-  }) async {
-    final SwipeSessionRecord record = SwipeSessionRecord.fromSummary(
-      summary: summary,
-      contextSocial: contextSocial,
-      contextEnergy: contextEnergy,
-      contextSleep: contextSleep,
+  }) {
+    return saveRecord(
+      uid: uid,
+      record: SwipeSessionRecord.fromSummary(
+        summary: summary,
+        contextSocial: contextSocial,
+        contextEnergy: contextEnergy,
+        contextSleep: contextSleep,
+      ),
     );
+  }
+
+  @override
+  Future<SwipeSessionSaveResult> saveRecord({
+    required String uid,
+    required SwipeSessionRecord record,
+  }) async {
     final List<PulseSessionHistoryEntry> sessionHistory =
         await _readSessionHistory(uid);
     final PulseSessionHistoryEntry pendingSession = PulseSessionHistoryEntry(
       date: record.sessionId,
-      contextSocial: contextSocial,
-      contextEnergy: contextEnergy,
-      contextSleep: contextSleep,
+      contextSocial: record.contextSocial,
+      contextEnergy: record.contextEnergy,
+      contextSleep: record.contextSleep,
     );
     final List<PulseSessionHistoryEntry> pendingHistory = _upsertSessionHistory(
       sessionHistory,
@@ -250,5 +272,132 @@ class FirestoreSwipeSessionRepository implements SwipeSessionRepository {
               .map(SwipeSessionRecord.fromFirestore)
               .toList(growable: false);
         });
+  }
+}
+
+class OfflineFirstSwipeSessionRepository implements SwipeSessionRepository {
+  const OfflineFirstSwipeSessionRepository({
+    required RemoteSwipeSessionRepository remoteRepository,
+    required PulseAppDatabase database,
+    required PulseConnectivityService connectivityService,
+  }) : _remoteRepository = remoteRepository,
+       _database = database,
+       _connectivityService = connectivityService;
+
+  final RemoteSwipeSessionRepository _remoteRepository;
+  final PulseAppDatabase _database;
+  final PulseConnectivityService _connectivityService;
+
+  @override
+  Future<SwipeSessionSaveResult> saveSession({
+    required String uid,
+    required SwipeSessionSummary summary,
+    String? contextSocial,
+    String? contextEnergy,
+    String? contextSleep,
+  }) async {
+    final SwipeSessionRecord record = SwipeSessionRecord.fromSummary(
+      summary: summary,
+      contextSocial: contextSocial,
+      contextEnergy: contextEnergy,
+      contextSleep: contextSleep,
+    );
+
+    final bool isOffline = !(await _connectivityService.currentState()).isOnline;
+    if (isOffline) {
+      return _queuePendingSession(uid: uid, record: record);
+    }
+
+    try {
+      final SwipeSessionSaveResult result = await _remoteRepository.saveRecord(
+        uid: uid,
+        record: record,
+      );
+      await _database.removePendingSession(uid: uid, sessionId: record.sessionId);
+      return result;
+    } on FirebaseException catch (error) {
+      if (_isOfflineFailure(error)) {
+        return _queuePendingSession(
+          uid: uid,
+          record: record,
+          errorMessage: error.message,
+        );
+      }
+
+      final bool isOfflineNow =
+          !(await _connectivityService.currentState()).isOnline;
+      if (isOfflineNow) {
+        return _queuePendingSession(
+          uid: uid,
+          record: record,
+          errorMessage: error.message,
+        );
+      }
+
+      rethrow;
+    } catch (_) {
+      final bool isOfflineNow =
+          !(await _connectivityService.currentState()).isOnline;
+      if (isOfflineNow) {
+        return _queuePendingSession(uid: uid, record: record);
+      }
+
+      rethrow;
+    }
+  }
+
+  Future<SwipeSessionSaveResult> _queuePendingSession({
+    required String uid,
+    required SwipeSessionRecord record,
+    String? errorMessage,
+  }) async {
+    final PendingSwipeSession pendingSession = PendingSwipeSession(
+      uid: uid,
+      session: record,
+      status: PendingSwipeSessionStatus.pending,
+      errorMessage: errorMessage,
+      createdAt: record.completedAt,
+      updatedAt: record.completedAt,
+    );
+
+    await _database.queuePendingSession(
+      uid: uid,
+      sessionId: record.sessionId,
+      sessionDate: record.date,
+      payloadJson: pendingSession.payloadJson,
+      status: pendingSession.status.storageValue,
+      errorMessage: pendingSession.errorMessage,
+      createdAt: pendingSession.createdAt,
+    );
+
+    return SwipeSessionSaveResult(
+      session: record,
+      reward: const SwipeSessionRewardDetails(
+        xpEarned: 0,
+        previousLevelProgress: PulseLevelProgress(),
+        levelProgress: PulseLevelProgress(),
+        previousStreak: PulseStreak(),
+        currentStreak: PulseStreak(),
+      ),
+      isPendingSync: true,
+    );
+  }
+
+  bool _isOfflineFailure(FirebaseException error) {
+    return error.code == 'network-request-failed' ||
+        error.code == 'unavailable';
+  }
+
+  @override
+  Stream<SwipeSessionRecord?> watchSession({
+    required String uid,
+    required String sessionId,
+  }) {
+    return _remoteRepository.watchSession(uid: uid, sessionId: sessionId);
+  }
+
+  @override
+  Stream<List<SwipeSessionRecord>> watchSessions({required String uid}) {
+    return _remoteRepository.watchSessions(uid: uid);
   }
 }

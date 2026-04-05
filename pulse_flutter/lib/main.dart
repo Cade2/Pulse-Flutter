@@ -5,12 +5,15 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/core/connectivity/pulse_connectivity_service.dart';
+import 'package:pulse_flutter/core/database/pulse_app_database.dart';
 import 'package:pulse_flutter/core/firestore/user_messaging_repository.dart';
 import 'package:pulse_flutter/core/notifications/pulse_firebase_messaging_service.dart';
 import 'package:pulse_flutter/core/notifications/pulse_local_notification_service.dart';
 import 'package:pulse_flutter/core/providers/connectivity_providers.dart';
+import 'package:pulse_flutter/core/providers/database_providers.dart';
 import 'package:pulse_flutter/core/providers/messaging_providers.dart';
 import 'package:pulse_flutter/core/providers/notification_providers.dart';
+import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -34,6 +37,7 @@ Future<void> main() async {
       PulseFirebaseMessagingService();
   final PulseConnectivityPlusService connectivityService =
       PulseConnectivityPlusService();
+  final PulseAppDatabase appDatabase = PulseAppDatabase.openDefault();
   final UserMessagingRepository userMessagingRepository =
       UserMessagingRepository(FirebaseFirestore.instance);
   await notificationService.initialize();
@@ -50,6 +54,8 @@ Future<void> main() async {
         ),
         pulseMessagingServiceProvider.overrideWithValue(messagingService),
         pulseConnectivityServiceProvider.overrideWithValue(connectivityService),
+        offlineQueueEnabledProvider.overrideWithValue(true),
+        pulseAppDatabaseProvider.overrideWithValue(appDatabase),
         userMessagingRepositoryProvider.overrideWithValue(
           userMessagingRepository,
         ),

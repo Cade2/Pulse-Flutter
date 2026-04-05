@@ -51,6 +51,7 @@ class _SwipeCompletionScreenState extends State<SwipeCompletionScreen> {
     final int currentLevel = reward?.levelProgress.currentLevel ?? 1;
     final int totalXp = reward?.levelProgress.totalXp ?? 0;
     final String contextSummary = _buildContextSummary();
+    final bool isPendingSync = widget.result?.isPendingSync ?? false;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Pulse session')),
@@ -73,6 +74,8 @@ class _SwipeCompletionScreenState extends State<SwipeCompletionScreen> {
                   Text(
                     session == null
                         ? 'Your swipe session has ended.'
+                        : isPendingSync
+                        ? 'Session ${session.sessionId} was saved on this device and will sync when you reconnect.'
                         : 'Session ${session.sessionId} was saved to your history.',
                     style: textTheme.bodyLarge,
                     textAlign: TextAlign.center,

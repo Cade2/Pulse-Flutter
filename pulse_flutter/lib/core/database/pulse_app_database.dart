@@ -103,6 +103,56 @@ class PulseAppDatabase extends _$PulseAppDatabase {
         .watch();
   }
 
+  Stream<PendingSession?> watchPendingSession({
+    required String uid,
+    required String sessionId,
+  }) {
+    return (select(pendingSessions)
+          ..where((table) => table.uid.equals(uid))
+          ..where((table) => table.sessionId.equals(sessionId)))
+        .watchSingleOrNull();
+  }
+
+  Future<List<PendingSession>> readPendingSessions(String uid) {
+    return (select(pendingSessions)
+          ..where((table) => table.uid.equals(uid))
+          ..orderBy(<OrderingTerm Function(PendingSessions)>[
+            (table) => OrderingTerm(
+              expression: table.createdAt,
+              mode: OrderingMode.asc,
+            ),
+          ]))
+        .get();
+  }
+
+  Future<void> updatePendingSessionStatus({
+    required String uid,
+    required String sessionId,
+    required String status,
+    String? errorMessage,
+  }) {
+    return (update(pendingSessions)
+          ..where((table) => table.uid.equals(uid))
+          ..where((table) => table.sessionId.equals(sessionId)))
+        .write(
+          PendingSessionsCompanion(
+            status: Value(status),
+            errorMessage: Value(errorMessage),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+  }
+
+  Future<void> removePendingSession({
+    required String uid,
+    required String sessionId,
+  }) {
+    return (delete(pendingSessions)
+          ..where((table) => table.uid.equals(uid))
+          ..where((table) => table.sessionId.equals(sessionId)))
+        .go();
+  }
+
   Future<void> cacheInsights({
     required String uid,
     required String cacheKey,

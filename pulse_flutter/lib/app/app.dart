@@ -11,6 +11,7 @@ import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/messaging_providers.dart';
 import 'package:pulse_flutter/core/notifications/pulse_local_notification_service.dart';
 import 'package:pulse_flutter/core/providers/notification_providers.dart';
+import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
 class PulseApp extends ConsumerStatefulWidget {
@@ -24,6 +25,7 @@ class _PulseAppState extends ConsumerState<PulseApp> {
   late final ProviderSubscription<PulseReminderSyncState?>
   _reminderSubscription;
   late final ProviderSubscription<String?> _messagingUserSubscription;
+  late final ProviderSubscription<String?> _pendingSessionSyncSubscription;
   late final StreamSubscription<PulsePushMessage> _openedPushMessageSubscription;
   String? _lastHandledOpenedMessageKey;
   bool _hasRenderedFirstFrame = false;
@@ -67,12 +69,26 @@ class _PulseAppState extends ConsumerState<PulseApp> {
       },
       fireImmediately: true,
     );
+    _pendingSessionSyncSubscription = ref.listenManual<String?>(
+      pendingSessionSyncUidProvider,
+      (previous, next) {
+        if (previous == next || next == null) {
+          return;
+        }
+
+        unawaited(
+          ref.read(pendingSessionSyncControllerProvider).syncQueuedSessions(next),
+        );
+      },
+      fireImmediately: true,
+    );
   }
 
   @override
   void dispose() {
     _reminderSubscription.close();
     _messagingUserSubscription.close();
+    _pendingSessionSyncSubscription.close();
     unawaited(_openedPushMessageSubscription.cancel());
     super.dispose();
   }

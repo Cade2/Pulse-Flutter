@@ -3,16 +3,46 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_reward_details.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_save_result.dart';
+import 'package:pulse_flutter/features/swipe_session/presentation/swipe_completion_celebrations.dart';
 
-class SwipeCompletionScreen extends StatelessWidget {
+class SwipeCompletionScreen extends StatefulWidget {
   const SwipeCompletionScreen({super.key, this.result});
 
   final SwipeSessionSaveResult? result;
 
   @override
+  State<SwipeCompletionScreen> createState() => _SwipeCompletionScreenState();
+}
+
+class _SwipeCompletionScreenState extends State<SwipeCompletionScreen> {
+  bool _hasShownCelebrations = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showCelebrationsIfNeeded();
+    });
+  }
+
+  Future<void> _showCelebrationsIfNeeded() async {
+    if (_hasShownCelebrations || !mounted) {
+      return;
+    }
+
+    _hasShownCelebrations = true;
+    final SwipeSessionRewardDetails? reward = widget.result?.reward;
+    if (reward == null) {
+      return;
+    }
+
+    await showSwipeCompletionCelebrations(context, reward);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final session = result?.session;
-    final SwipeSessionRewardDetails? reward = result?.reward;
+    final session = widget.result?.session;
+    final SwipeSessionRewardDetails? reward = widget.result?.reward;
     final TextTheme textTheme = Theme.of(context).textTheme;
     final int acceptedCount = session?.acceptedCount ?? 0;
     final int rejectedCount = session?.rejectedCount ?? 0;
@@ -189,7 +219,7 @@ class SwipeCompletionScreen extends StatelessWidget {
   }
 
   String _buildContextSummary() {
-    final session = result?.session;
+    final session = widget.result?.session;
     if (session == null) {
       return 'No context tags were saved.';
     }

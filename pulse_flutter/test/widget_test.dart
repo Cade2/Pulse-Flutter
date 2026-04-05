@@ -1342,6 +1342,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_bottomNavFinder, findsNothing);
+    expect(find.byKey(const Key('level-up-celebration-dialog')), findsNothing);
+    expect(
+      find.byKey(const Key('badge-unlock-celebration-dialog')),
+      findsOneWidget,
+    );
+    expect(find.text('Badge unlocked!'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('badge-unlock-celebration-continue')),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Session complete'), findsOneWidget);
     expect(find.text('Session reward'), findsOneWidget);
     expect(find.text('+65 XP'), findsOneWidget);
@@ -1360,7 +1371,7 @@ void main() {
   });
 
   testWidgets(
-    'completion surfaces level-up, new badges, and streak milestone',
+    'completion shows level-up and badge celebrations before the reward details',
     (WidgetTester tester) async {
       final _FakeSwipeSessionRepository fakeRepository =
           _FakeSwipeSessionRepository(
@@ -1454,6 +1465,33 @@ void main() {
       await tester.tap(find.text('Save session'));
       await tester.pumpAndSettle();
 
+      expect(
+        find.byKey(const Key('level-up-celebration-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('Level up!'), findsOneWidget);
+      expect(find.text('You reached Level 5.'), findsWidgets);
+      await tester.tap(find.byKey(const Key('level-up-celebration-continue')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('badge-unlock-celebration-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('Badges unlocked!'), findsOneWidget);
+      expect(find.text('On A Roll'), findsWidgets);
+      expect(find.text('Seven Check-Ins'), findsWidgets);
+      await tester.tap(
+        find.byKey(const Key('badge-unlock-celebration-continue')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('level-up-celebration-dialog')), findsNothing);
+      expect(
+        find.byKey(const Key('badge-unlock-celebration-dialog')),
+        findsNothing,
+      );
+      expect(find.text('Session complete'), findsOneWidget);
       expect(find.text('Level up'), findsOneWidget);
       expect(find.text('You reached Level 5.'), findsOneWidget);
       expect(find.text('New badges'), findsOneWidget);

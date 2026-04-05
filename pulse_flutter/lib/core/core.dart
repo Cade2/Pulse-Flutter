@@ -1,3 +1,5 @@
+export 'connectivity/pulse_connectivity_service.dart';
+export 'database/pulse_app_database.dart';
 export 'firebase/firebase_auth_service.dart';
 export 'firestore/swipe_session_repository.dart';
 export 'firestore/pulse_account_repository.dart';
@@ -21,6 +23,8 @@ export 'models/pulse_weekly_pulse_score.dart';
 export 'providers/auth_providers.dart';
 export 'providers/account_providers.dart';
 export 'providers/badge_providers.dart';
+export 'providers/connectivity_providers.dart';
+export 'providers/database_providers.dart';
 export 'providers/insight_providers.dart';
 export 'providers/leaderboard_providers.dart';
 export 'providers/messaging_providers.dart';

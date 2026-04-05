@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
+import 'package:pulse_flutter/components/pulse_offline_banner.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({
     super.key,
     required this.child,
@@ -76,9 +78,14 @@ class AppShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      body: child,
+      body: Column(
+        children: [
+          const PulseOfflineBanner(),
+          Expanded(child: child),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         key: const Key('pulse-bottom-nav'),
         selectedIndex: _selectedIndex,

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firebase/firebase_auth_service.dart';
+import 'package:pulse_flutter/core/firebase/social_auth_clients.dart';
 import 'package:pulse_flutter/core/firestore/pulse_account_repository.dart';
 import 'package:pulse_flutter/core/firestore/swipe_session_repository.dart';
 import 'package:pulse_flutter/core/firestore/user_profile_repository.dart';
@@ -59,6 +60,8 @@ void main() {
 
     expect(find.text('Login'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(2));
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Continue with Apple'), findsOneWidget);
     expect(_bottomNavFinder, findsNothing);
 
     final BuildContext context = tester.element(find.text('Login'));
@@ -68,6 +71,82 @@ void main() {
     expect(find.text('Splash'), findsOneWidget);
     expect(find.text('Home'), findsNothing);
   });
+
+  testWidgets(
+    'login screen shows social sign-in actions and handles unavailable providers gracefully',
+    (WidgetTester tester) async {
+      final StreamController<PulseUserProfile?> profileController =
+          StreamController<PulseUserProfile?>.broadcast();
+      addTearDown(profileController.close);
+      final _FakeFirebaseAuthService fakeAuthService =
+          _FakeFirebaseAuthService()
+            ..googleSignInException = PulseSocialAuthException.unavailable(
+              'Google',
+            )
+            ..appleSignInException = PulseSocialAuthException.unavailable(
+              'Apple',
+            );
+      final _FakeUserProfileRepository fakeUserProfileRepository =
+          _FakeUserProfileRepository(
+            initialProfile: _buildProfile(email: 'tester@example.com'),
+            profileController: profileController,
+          );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => null),
+            isAuthenticatedProvider.overrideWith((ref) => false),
+            firebaseAuthServiceProvider.overrideWithValue(fakeAuthService),
+            userProfileRepositoryProvider.overrideWithValue(
+              fakeUserProfileRepository,
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Start onboarding'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue to login'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Continue with Apple'), findsOneWidget);
+
+      final Finder googleButton = find.widgetWithText(
+        OutlinedButton,
+        'Continue with Google',
+      );
+      final Finder appleButton = find.widgetWithText(
+        OutlinedButton,
+        'Continue with Apple',
+      );
+
+      await tester.ensureVisible(googleButton);
+      await tester.tap(googleButton);
+      await tester.pumpAndSettle();
+
+      expect(fakeAuthService.googleSignInCalled, isTrue);
+      expect(
+        find.text('Google sign-in is not available on this device yet.'),
+        findsOneWidget,
+      );
+
+      await tester.ensureVisible(appleButton);
+      await tester.tap(appleButton);
+      await tester.pumpAndSettle();
+
+      expect(fakeAuthService.appleSignInCalled, isTrue);
+      expect(
+        find.text('Apple sign-in is not available on this device yet.'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('signed-in users are routed to home', (
     WidgetTester tester,
@@ -1965,6 +2044,10 @@ class _FakeWidgetNotificationTapSource
 
 class _FakeFirebaseAuthService implements FirebaseAuthService {
   bool signOutCalled = false;
+  bool googleSignInCalled = false;
+  bool appleSignInCalled = false;
+  Object? googleSignInException;
+  Object? appleSignInException;
 
   @override
   User? get currentUser => null;
@@ -1990,6 +2073,26 @@ class _FakeFirebaseAuthService implements FirebaseAuthService {
     required String email,
     required String password,
   }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<UserCredential> signInWithGoogle() async {
+    googleSignInCalled = true;
+    if (googleSignInException != null) {
+      throw googleSignInException!;
+    }
+
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<UserCredential> signInWithApple() async {
+    appleSignInCalled = true;
+    if (appleSignInException != null) {
+      throw appleSignInException!;
+    }
+
     throw UnimplementedError();
   }
 

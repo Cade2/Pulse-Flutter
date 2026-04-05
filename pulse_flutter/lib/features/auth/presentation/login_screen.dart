@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
+import 'package:pulse_flutter/core/firebase/firebase_auth_service.dart';
+import 'package:pulse_flutter/core/firebase/social_auth_clients.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
-enum _AuthAction { signIn, createAccount }
+enum _AuthAction { signIn, createAccount, googleSignIn, appleSignIn }
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -32,13 +34,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _submit(_AuthAction action) async {
+  Future<void> _submitEmailAuth(_AuthAction action) async {
     final FormState? form = _formKey.currentState;
 
     if (form == null || !form.validate()) {
       return;
     }
 
+    await _authenticate(
+      action,
+      (authService) {
+        if (action == _AuthAction.signIn) {
+          return authService.signInWithEmailAndPassword(
+            email: _emailController.text,
+            password: _passwordController.text,
+          );
+        }
+
+        return authService.createUserWithEmailAndPassword(
+          email: _emailController.text,
+          password: _passwordController.text,
+        );
+      },
+    );
+  }
+
+  Future<void> _submitSocialAuth(_AuthAction action) async {
+    await _authenticate(
+      action,
+      (authService) {
+        if (action == _AuthAction.googleSignIn) {
+          return authService.signInWithGoogle();
+        }
+
+        return authService.signInWithApple();
+      },
+    );
+  }
+
+  Future<void> _authenticate(
+    _AuthAction action,
+    Future<UserCredential> Function(FirebaseAuthService authService) authenticate,
+  ) async {
     FocusScope.of(context).unfocus();
 
     setState(() {
@@ -52,23 +89,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final authService = ref.read(firebaseAuthServiceProvider);
       final userProfileRepository = ref.read(userProfileRepositoryProvider);
-      final UserCredential userCredential;
-
-      if (action == _AuthAction.signIn) {
-        userCredential = await authService.signInWithEmailAndPassword(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
-      } else {
-        userCredential = await authService.createUserWithEmailAndPassword(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
-      }
+      final UserCredential userCredential = await authenticate(authService);
 
       didAuthenticate = true;
 
-      final User? user = userCredential.user;
+      final User? user = userCredential.user ?? authService.currentUser;
       if (user == null) {
         throw StateError('Authentication completed without a user.');
       }
@@ -80,6 +105,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
 
       context.goNamed(AppRoutes.homeName);
+    } on PulseSocialAuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _errorMessage = error.message;
+      });
     } on FirebaseAuthException catch (error) {
       if (!mounted) {
         return;
@@ -224,7 +257,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       validator: _validatePassword,
                       onFieldSubmitted: (_) {
                         if (!_isSubmitting) {
-                          _submit(_AuthAction.signIn);
+                          _submitEmailAuth(_AuthAction.signIn);
                         }
                       },
                     ),
@@ -253,7 +286,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     FilledButton(
                       onPressed: _isSubmitting
                           ? null
-                          : () => _submit(_AuthAction.signIn),
+                          : () => _submitEmailAuth(_AuthAction.signIn),
                       child: _activeAction == _AuthAction.signIn
                           ? const SizedBox(
                               height: 20,
@@ -266,7 +299,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     OutlinedButton(
                       onPressed: _isSubmitting
                           ? null
-                          : () => _submit(_AuthAction.createAccount),
+                          : () => _submitEmailAuth(_AuthAction.createAccount),
                       child: _activeAction == _AuthAction.createAccount
                           ? const SizedBox(
                               height: 20,
@@ -274,6 +307,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('Create account'),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'or continue with',
+                            style: textTheme.bodySmall,
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    OutlinedButton.icon(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => _submitSocialAuth(_AuthAction.googleSignIn),
+                      icon: _activeAction == _AuthAction.googleSignIn
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.public_rounded),
+                      label: const Text('Continue with Google'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => _submitSocialAuth(_AuthAction.appleSignIn),
+                      icon: _activeAction == _AuthAction.appleSignIn
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.apple),
+                      label: const Text('Continue with Apple'),
                     ),
                   ],
                 ),

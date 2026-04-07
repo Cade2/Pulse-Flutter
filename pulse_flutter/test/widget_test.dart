@@ -185,6 +185,115 @@ void main() {
     expect(find.text('0 days'), findsOneWidget);
   });
 
+  testWidgets('home shows a returning-user surface after missed streak days', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+                currentStreak: 5,
+                longestStreak: 8,
+                lastSessionDate: '2026-04-03',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 0,
+              longestStreak: 8,
+              lastSessionDate: '2026-04-03',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 7),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome back to Pulse'), findsOneWidget);
+    expect(
+      find.textContaining('3 missed days since your last check-in'),
+      findsOneWidget,
+    );
+    expect(find.text('Longest streak saved: 8 days.'), findsOneWidget);
+  });
+
+  testWidgets('home shows milestone proximity when a streak is close', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+                currentStreak: 6,
+                longestStreak: 6,
+                lastSessionDate: '2026-04-07',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 6,
+              longestStreak: 6,
+              lastSessionDate: '2026-04-07',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 7),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Milestone nearby'), findsOneWidget);
+    expect(
+      find.text('You are 1 day away from a 7-day streak milestone.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Complete today\'s session to keep moving toward it.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'launching from a notification routes into the targeted history detail',
     (WidgetTester tester) async {
@@ -2030,6 +2139,9 @@ PulseUserProfile _buildProfile({
   required String email,
   String? displayName,
   String avatarColour = PulseUserProfile.defaultAvatarColour,
+  int currentStreak = 0,
+  int longestStreak = 0,
+  String? lastSessionDate,
   String? referralCode,
   int referralCount = PulseReferral.defaultReferralCount,
   PulseProfileSettings settings = const PulseProfileSettings(),
@@ -2039,6 +2151,9 @@ PulseUserProfile _buildProfile({
     email: email,
     displayName: displayName,
     avatarColour: avatarColour,
+    currentStreak: currentStreak,
+    longestStreak: longestStreak,
+    lastSessionDate: lastSessionDate,
     referralCode: referralCode,
     referralCount: referralCount,
     settings: settings,

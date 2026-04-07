@@ -128,6 +128,31 @@ class PulseStreak {
     );
   }
 
+  int? daysSinceLastSession(DateTime currentDate) {
+    final DateTime? lastDate = _parseSessionDate(lastSessionDate);
+    if (lastDate == null) {
+      return null;
+    }
+
+    final int difference = _normalizeDate(
+      currentDate,
+    ).difference(_normalizeDate(lastDate)).inDays;
+    if (difference < 0) {
+      return 0;
+    }
+
+    return difference;
+  }
+
+  int missedDaysAsOf(DateTime currentDate) {
+    final int? daysSinceLast = daysSinceLastSession(currentDate);
+    if (daysSinceLast == null || daysSinceLast <= 1) {
+      return 0;
+    }
+
+    return daysSinceLast - 1;
+  }
+
   bool matches(PulseStreak other) {
     return currentStreak == other.currentStreak &&
         longestStreak == other.longestStreak &&

@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
+import 'package:pulse_flutter/core/models/pulse_streak_engagement.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/streak_engagement_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
@@ -76,6 +78,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final int currentStreak = ref
         .watch(currentUserStreakProvider)
         .currentStreak;
+    final PulseStreakEngagement streakEngagement = ref.watch(
+      currentUserStreakEngagementProvider,
+    );
     final AsyncValue<SwipeSessionRecord?> todaySessionAsync = ref.watch(
       todaySwipeSessionProvider,
     );
@@ -145,6 +150,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     _LevelProgressCard(levelProgress: levelProgress),
                     const SizedBox(height: 16),
                     _StreakSummaryCard(currentStreak: currentStreak),
+                    if (streakEngagement.shouldSurface) ...[
+                      const SizedBox(height: 16),
+                      _StreakEngagementCard(engagement: streakEngagement),
+                    ],
                     const SizedBox(height: 16),
                     _TodaySessionStatusCard(
                       todaySessionAsync: todaySessionAsync,
@@ -454,6 +463,77 @@ class _TodaySessionStatusCard extends StatelessWidget {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _StreakEngagementCard extends StatelessWidget {
+  const _StreakEngagementCard({required this.engagement});
+
+  final PulseStreakEngagement engagement;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextTheme textTheme = theme.textTheme;
+    final Color accentColor =
+        engagement.kind == PulseStreakEngagementKind.milestoneNearby
+        ? theme.colorScheme.primary
+        : theme.colorScheme.tertiary;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accentColor.withValues(alpha: 0.45)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Icon(
+                      engagement.kind ==
+                              PulseStreakEngagementKind.milestoneNearby
+                          ? Icons.flag_rounded
+                          : Icons.refresh_rounded,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(engagement.title, style: textTheme.titleLarge),
+                      const SizedBox(height: 8),
+                      Text(engagement.message, style: textTheme.bodyMedium),
+                      if (engagement.supportingText.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          engagement.supportingText,
+                          style: textTheme.bodySmall,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

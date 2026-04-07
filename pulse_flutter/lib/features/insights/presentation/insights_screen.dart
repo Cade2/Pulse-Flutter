@@ -85,6 +85,13 @@ class InsightsScreen extends ConsumerWidget {
                               _SessionRhythmChartCard(report: report),
                               const SizedBox(height: 16),
                               _EmotionContextPatternsCard(report: report),
+                              const SizedBox(height: 16),
+                              if (report.hasLongHorizonInsights) ...[
+                                _EmotionalYearSummaryCard(report: report),
+                                const SizedBox(height: 16),
+                                _EmotionalYearTimelineCard(report: report),
+                              ] else
+                                _LongHorizonUnlockCard(report: report),
                             ],
                           )
                         else
@@ -469,10 +476,7 @@ class _AcceptedEmotionsChartCard extends StatelessWidget {
         children: [
           Text('Top accepted emotions', style: textTheme.titleLarge),
           const SizedBox(height: 8),
-          Text(
-            'Emotion mix',
-            style: textTheme.headlineSmall,
-          ),
+          Text('Emotion mix', style: textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(
             'A quick view of the emotions you accept most often in Pulse.',
@@ -491,9 +495,7 @@ class _AcceptedEmotionsChartCard extends StatelessWidget {
                 child: _InsightBarRow(
                   label: item.label,
                   count: item.count,
-                  shareLabel: _formatPercent(
-                    report.acceptedEmotionShare(item),
-                  ),
+                  shareLabel: _formatPercent(report.acceptedEmotionShare(item)),
                   maxCount: items.first.count,
                 ),
               );
@@ -566,9 +568,11 @@ class _SessionRhythmChartCard extends StatelessWidget {
       'Saturday',
       'Sunday',
     ];
-    final Map<String, PulseInsightCount> countsByDay = <String, PulseInsightCount>{
-      for (final PulseInsightCount count in report.weekdaySessions) count.label: count,
-    };
+    final Map<String, PulseInsightCount> countsByDay =
+        <String, PulseInsightCount>{
+          for (final PulseInsightCount count in report.weekdaySessions)
+            count.label: count,
+        };
     final int maxCount = report.weekdaySessions.isEmpty
         ? 1
         : report.weekdaySessions.first.count;
@@ -579,10 +583,7 @@ class _SessionRhythmChartCard extends StatelessWidget {
         children: [
           Text('Session rhythm', style: textTheme.titleLarge),
           const SizedBox(height: 8),
-          Text(
-            'Weekday pattern',
-            style: textTheme.headlineSmall,
-          ),
+          Text('Weekday pattern', style: textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(
             'See where your saved sessions cluster across the week.',
@@ -663,7 +664,9 @@ class _ExpandedPatternsCard extends StatelessWidget {
               ),
               _PatternSignalTile(
                 title: 'Context anchors',
-                value: contextAnchor.isEmpty ? 'No strong context yet' : contextAnchor,
+                value: contextAnchor.isEmpty
+                    ? 'No strong context yet'
+                    : contextAnchor,
                 supporting: contextAnchor.isEmpty
                     ? 'Saved social, energy, and sleep tags will combine here.'
                     : 'Most common social, energy, and sleep signals so far.',
@@ -713,6 +716,151 @@ class _EmotionContextPatternsCard extends StatelessWidget {
                 ),
               );
             }),
+        ],
+      ),
+    );
+  }
+}
+
+class _LongHorizonUnlockCard extends StatelessWidget {
+  const _LongHorizonUnlockCard({required this.report});
+
+  final PulseInsightsReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final int progress = report.progressToward(
+      PulseInsightsReport.longHorizonUnlockSessionCount,
+    );
+    final double progressValue =
+        progress / PulseInsightsReport.longHorizonUnlockSessionCount;
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Emotional year unlocks at 30 sessions',
+            style: textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$progress / ${PulseInsightsReport.longHorizonUnlockSessionCount} sessions',
+            style: textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(value: progressValue, minHeight: 8),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            report.sessionsUntilLongHorizon == 1
+                ? 'Save 1 more session to unlock your long-horizon emotional year view.'
+                : 'Save ${report.sessionsUntilLongHorizon} more sessions to unlock your long-horizon emotional year view.',
+            style: textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmotionalYearSummaryCard extends StatelessWidget {
+  const _EmotionalYearSummaryCard({required this.report});
+
+  final PulseInsightsReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final PulseInsightMonthSummary? mostActiveMonth = report.mostActiveMonth;
+    final PulseInsightCount? rarestEmotion = report.rarestAcceptedEmotion;
+    final PulseInsightTrend? monthTrend = report.monthOverMonthTrend;
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Emotional year', style: textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            '${report.activeMonthCount} active months tracked',
+            style: textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'This longer-horizon layer looks across the months already saved in Pulse.',
+            style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          _InsightRow(
+            label: 'Most active month',
+            value: mostActiveMonth?.label ?? 'No month signal yet',
+            supporting: mostActiveMonth == null
+                ? 'Monthly activity will appear here once more history is saved.'
+                : mostActiveMonth.sessionCountText,
+          ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Rarest emotion',
+            value: rarestEmotion?.label ?? 'No accepted emotions yet',
+            supporting:
+                rarestEmotion?.countText ??
+                'Accepted emotions will surface the rarest signal here.',
+          ),
+          const SizedBox(height: 12),
+          _InsightRow(
+            label: 'Recent month trend',
+            value: monthTrend?.label ?? 'Need 2 active months',
+            supporting: monthTrend == null
+                ? 'A month-over-month trend appears once two active months are saved.'
+                : '${monthTrend.currentLabel} compared with ${monthTrend.previousLabel}.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmotionalYearTimelineCard extends StatelessWidget {
+  const _EmotionalYearTimelineCard({required this.report});
+
+  final PulseInsightsReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final List<PulseInsightMonthSummary> months = report.recentMonthlySummaries;
+    final int maxCount = months.isEmpty
+        ? 1
+        : months
+              .map((summary) => summary.sessionCount)
+              .reduce((lhs, rhs) => lhs > rhs ? lhs : rhs);
+
+    return _InsightsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Monthly pulse trail', style: textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            'Recent months, their session volume, and the top emotion each month.',
+            style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 20),
+          ...months.map((summary) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _InsightBarRow(
+                label: summary.label,
+                count: summary.sessionCount,
+                shareLabel: summary.topEmotion ?? 'No accepted emotions',
+                maxCount: maxCount,
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -929,15 +1077,9 @@ class _InsightBarRow extends StatelessWidget {
               children: [
                 Expanded(child: Text(label, style: textTheme.bodyLarge)),
                 const SizedBox(width: 12),
-                Text(
-                  '$count',
-                  style: textTheme.titleMedium,
-                ),
+                Text('$count', style: textTheme.titleMedium),
                 const SizedBox(width: 8),
-                Text(
-                  shareLabel,
-                  style: textTheme.bodySmall,
-                ),
+                Text(shareLabel, style: textTheme.bodySmall),
               ],
             ),
             const SizedBox(height: 8),
@@ -1025,9 +1167,7 @@ class _ShareCardSheet extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: SingleChildScrollView(
-                child: PulseShareCard(data: data),
-              ),
+              child: SingleChildScrollView(child: PulseShareCard(data: data)),
             ),
             const SizedBox(height: 20),
             FilledButton(

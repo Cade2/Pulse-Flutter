@@ -87,7 +87,10 @@ void main() {
     expect(report.topContextTag?.count, 4);
     expect(report.mostActiveWeekday?.label, 'Wednesday');
     expect(report.mostActiveWeekday?.count, 3);
-    expect(report.weekdayShare(report.mostActiveWeekday), closeTo(3 / 5, 0.0001));
+    expect(
+      report.weekdayShare(report.mostActiveWeekday),
+      closeTo(3 / 5, 0.0001),
+    );
     expect(report.topSocialContext?.label, 'Friends');
     expect(report.topEnergyTag?.label, 'Steady');
     expect(report.topSleepTag?.label, 'Good');
@@ -140,7 +143,10 @@ void main() {
       expect(report.topEnergyTag?.label, 'Steady');
       expect(report.topSleepTag?.label, 'Good');
       expect(report.weekdaySessions, isNotEmpty);
-      expect(report.weekdayShare(report.mostActiveWeekday), closeTo(2 / 14, 0.0001));
+      expect(
+        report.weekdayShare(report.mostActiveWeekday),
+        closeTo(2 / 14, 0.0001),
+      );
       expect(report.topEmotionContextPattern?.emotion, 'Calm');
       expect(report.topEmotionContextPattern?.contextTag, 'Energy: Steady');
       expect(report.topEmotionContextPattern?.count, 9);
@@ -148,6 +154,62 @@ void main() {
       expect(report.currentWeekScore.score, 89);
       expect(report.previousWeekScore.score, 90);
       expect(report.weeklyScoreTrend?.label, '-1 vs last week');
+    },
+  );
+
+  test(
+    'long-horizon insights unlock at thirty sessions with rarest emotion and monthly summaries',
+    () {
+      final List<SwipeSessionRecord> sessions = <SwipeSessionRecord>[
+        for (int index = 1; index <= 6; index++)
+          _buildInsightSession(
+            date: '2026-01-${index.toString().padLeft(2, '0')}',
+            acceptedEmotions: const ['Calm', 'Joy'],
+            contextSocial: 'Friends',
+          ),
+        for (int index = 1; index <= 8; index++)
+          _buildInsightSession(
+            date: '2026-02-${index.toString().padLeft(2, '0')}',
+            acceptedEmotions: const ['Focus', 'Hope'],
+            contextEnergy: 'Steady',
+          ),
+        for (int index = 1; index <= 10; index++)
+          _buildInsightSession(
+            date: '2026-03-${index.toString().padLeft(2, '0')}',
+            acceptedEmotions: const ['Calm', 'Confidence'],
+            contextSleep: 'Good',
+          ),
+        for (int index = 1; index <= 6; index++)
+          _buildInsightSession(
+            date: '2026-04-${index.toString().padLeft(2, '0')}',
+            acceptedEmotions: <String>[
+              'Calm',
+              if (index <= 2) 'Vulnerability' else 'Curiosity',
+            ],
+            contextSocial: 'Solo',
+            contextEnergy: 'High',
+            contextSleep: 'Late',
+          ),
+      ];
+
+      final PulseInsightsReport report = PulseInsightsReport.fromSessions(
+        sessions,
+        currentDate: DateTime(2026, 4, 6),
+      );
+
+      expect(report.hasLongHorizonInsights, isTrue);
+      expect(report.sessionsUntilLongHorizon, 0);
+      expect(report.activeMonthCount, 4);
+      expect(report.recentMonthlySummaries, hasLength(4));
+      expect(report.mostActiveMonth?.label, 'Mar 2026');
+      expect(report.mostActiveMonth?.sessionCount, 10);
+      expect(report.rarestAcceptedEmotion?.label, 'Vulnerability');
+      expect(report.rarestAcceptedEmotion?.count, 2);
+      expect(report.monthOverMonthTrend?.currentLabel, 'Apr 2026');
+      expect(report.monthOverMonthTrend?.previousLabel, 'Mar 2026');
+      expect(report.monthOverMonthTrend?.delta, -4);
+      expect(report.monthOverMonthTrend?.label, '-4 sessions vs Mar 2026');
+      expect(report.recentMonthlySummaries.last.topEmotion, 'Calm');
     },
   );
 }

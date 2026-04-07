@@ -3,6 +3,8 @@ import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record
 
 enum PulseInsightsAvailability { locked, basic, expanded }
 
+enum PulseInsightTrendDirection { up, down, flat }
+
 class PulseInsightCount {
   const PulseInsightCount({required this.label, required this.count});
 
@@ -26,9 +28,69 @@ class PulseInsightPattern {
   String get countText => count == 1 ? '1 saved match' : '$count saved matches';
 }
 
+class PulseInsightMonthSummary {
+  const PulseInsightMonthSummary({
+    required this.monthStart,
+    required this.label,
+    required this.sessionCount,
+    required this.acceptedEmotionCount,
+    this.topEmotion,
+  });
+
+  final DateTime monthStart;
+  final String label;
+  final int sessionCount;
+  final int acceptedEmotionCount;
+  final String? topEmotion;
+
+  String get sessionCountText =>
+      sessionCount == 1 ? '1 session' : '$sessionCount sessions';
+
+  String get acceptedEmotionText => acceptedEmotionCount == 1
+      ? '1 accepted emotion'
+      : '$acceptedEmotionCount accepted emotions';
+
+  String get topEmotionSummary => topEmotion == null
+      ? 'No accepted emotions saved'
+      : 'Top emotion: $topEmotion';
+}
+
+class PulseInsightTrend {
+  const PulseInsightTrend({
+    required this.currentLabel,
+    required this.previousLabel,
+    required this.currentValue,
+    required this.previousValue,
+  }) : delta = currentValue - previousValue,
+       direction = currentValue > previousValue
+           ? PulseInsightTrendDirection.up
+           : currentValue < previousValue
+           ? PulseInsightTrendDirection.down
+           : PulseInsightTrendDirection.flat;
+
+  final String currentLabel;
+  final String previousLabel;
+  final int currentValue;
+  final int previousValue;
+  final int delta;
+  final PulseInsightTrendDirection direction;
+
+  String get label {
+    switch (direction) {
+      case PulseInsightTrendDirection.up:
+        return '+$delta sessions vs $previousLabel';
+      case PulseInsightTrendDirection.down:
+        return '$delta sessions vs $previousLabel';
+      case PulseInsightTrendDirection.flat:
+        return 'No session change vs $previousLabel';
+    }
+  }
+}
+
 class PulseInsightsReport {
   static const int basicUnlockSessionCount = 5;
   static const int expandedUnlockSessionCount = 14;
+  static const int longHorizonUnlockSessionCount = 30;
 
   const PulseInsightsReport({
     this.totalSessions = 0,
@@ -44,6 +106,7 @@ class PulseInsightsReport {
     this.sleepTags = const <PulseInsightCount>[],
     this.weekdaySessions = const <PulseInsightCount>[],
     this.emotionContextPatterns = const <PulseInsightPattern>[],
+    this.monthlySummaries = const <PulseInsightMonthSummary>[],
     required this.currentWeekScore,
     required this.previousWeekScore,
   });
@@ -61,6 +124,7 @@ class PulseInsightsReport {
   final List<PulseInsightCount> sleepTags;
   final List<PulseInsightCount> weekdaySessions;
   final List<PulseInsightPattern> emotionContextPatterns;
+  final List<PulseInsightMonthSummary> monthlySummaries;
   final PulseWeeklyPulseScore currentWeekScore;
   final PulseWeeklyPulseScore previousWeekScore;
 
@@ -89,6 +153,8 @@ class PulseInsightsReport {
     );
     final List<PulseInsightPattern> emotionContextPatterns =
         _countEmotionContextPatterns(sessions);
+    final List<PulseInsightMonthSummary> monthlySummaries =
+        _buildMonthlySummaries(sessions);
     final PulseWeeklyPulseScore currentWeekScore =
         PulseWeeklyPulseScore.fromHistory(
           sessions,
@@ -110,13 +176,19 @@ class PulseInsightsReport {
           .where((session) => session.contextTags.isNotEmpty)
           .length,
       sessionsWithSocialContext: sessions
-          .where((session) => (session.contextSocial?.trim().isNotEmpty ?? false))
+          .where(
+            (session) => (session.contextSocial?.trim().isNotEmpty ?? false),
+          )
           .length,
       sessionsWithEnergyTag: sessions
-          .where((session) => (session.contextEnergy?.trim().isNotEmpty ?? false))
+          .where(
+            (session) => (session.contextEnergy?.trim().isNotEmpty ?? false),
+          )
           .length,
       sessionsWithSleepTag: sessions
-          .where((session) => (session.contextSleep?.trim().isNotEmpty ?? false))
+          .where(
+            (session) => (session.contextSleep?.trim().isNotEmpty ?? false),
+          )
           .length,
       acceptedEmotionFrequency: acceptedEmotionFrequency,
       commonContextTags: commonContextTags,
@@ -125,6 +197,7 @@ class PulseInsightsReport {
       sleepTags: sleepTags,
       weekdaySessions: weekdaySessions,
       emotionContextPatterns: emotionContextPatterns,
+      monthlySummaries: monthlySummaries,
       currentWeekScore: currentWeekScore,
       previousWeekScore: previousWeekScore,
     );
@@ -147,10 +220,16 @@ class PulseInsightsReport {
   bool get hasExpandedInsights =>
       availability == PulseInsightsAvailability.expanded;
 
+  bool get hasLongHorizonInsights =>
+      totalSessions >= longHorizonUnlockSessionCount;
+
   int get sessionsUntilBasic => _remainingSessions(basicUnlockSessionCount);
 
   int get sessionsUntilExpanded =>
       _remainingSessions(expandedUnlockSessionCount);
+
+  int get sessionsUntilLongHorizon =>
+      _remainingSessions(longHorizonUnlockSessionCount);
 
   double get averageAcceptedPerSession {
     if (totalSessions == 0) {
@@ -163,6 +242,16 @@ class PulseInsightsReport {
   int get uniqueAcceptedEmotionCount => acceptedEmotionFrequency.length;
 
   int get activeWeekdayCount => weekdaySessions.length;
+
+  int get activeMonthCount => monthlySummaries.length;
+
+  List<PulseInsightMonthSummary> get recentMonthlySummaries {
+    if (monthlySummaries.length <= 6) {
+      return monthlySummaries;
+    }
+
+    return monthlySummaries.sublist(monthlySummaries.length - 6);
+  }
 
   double acceptedEmotionShare(PulseInsightCount? count) {
     if (count == null || totalAcceptedEmotions == 0) {
@@ -188,12 +277,38 @@ class PulseInsightsReport {
     return count.count / totalSessions;
   }
 
+  double monthShare(PulseInsightMonthSummary? summary) {
+    if (summary == null || totalSessions == 0) {
+      return 0;
+    }
+
+    return summary.sessionCount / totalSessions;
+  }
+
   PulseInsightCount? get topAcceptedEmotion {
     if (acceptedEmotionFrequency.isEmpty) {
       return null;
     }
 
     return acceptedEmotionFrequency.first;
+  }
+
+  PulseInsightCount? get rarestAcceptedEmotion {
+    if (acceptedEmotionFrequency.isEmpty) {
+      return null;
+    }
+
+    PulseInsightCount rarest = acceptedEmotionFrequency.first;
+
+    for (final PulseInsightCount count in acceptedEmotionFrequency.skip(1)) {
+      if (count.count < rarest.count ||
+          (count.count == rarest.count &&
+              count.label.compareTo(rarest.label) < 0)) {
+        rarest = count;
+      }
+    }
+
+    return rarest;
   }
 
   PulseInsightCount? get topContextTag {
@@ -242,6 +357,41 @@ class PulseInsightsReport {
     }
 
     return emotionContextPatterns.first;
+  }
+
+  PulseInsightMonthSummary? get mostActiveMonth {
+    if (monthlySummaries.isEmpty) {
+      return null;
+    }
+
+    PulseInsightMonthSummary mostActive = monthlySummaries.first;
+
+    for (final PulseInsightMonthSummary summary in monthlySummaries.skip(1)) {
+      if (summary.sessionCount > mostActive.sessionCount ||
+          (summary.sessionCount == mostActive.sessionCount &&
+              summary.monthStart.isAfter(mostActive.monthStart))) {
+        mostActive = summary;
+      }
+    }
+
+    return mostActive;
+  }
+
+  PulseInsightTrend? get monthOverMonthTrend {
+    if (monthlySummaries.length < 2) {
+      return null;
+    }
+
+    final PulseInsightMonthSummary current = monthlySummaries.last;
+    final PulseInsightMonthSummary previous =
+        monthlySummaries[monthlySummaries.length - 2];
+
+    return PulseInsightTrend(
+      currentLabel: current.label,
+      previousLabel: previous.label,
+      currentValue: current.sessionCount,
+      previousValue: previous.sessionCount,
+    );
   }
 
   PulseWeeklyPulseScoreTrend? get weeklyScoreTrend {
@@ -334,6 +484,75 @@ class PulseInsightsReport {
     return ranked;
   }
 
+  static List<PulseInsightMonthSummary> _buildMonthlySummaries(
+    List<SwipeSessionRecord> sessions,
+  ) {
+    final Map<DateTime, _PulseInsightMonthAccumulator> accumulators =
+        <DateTime, _PulseInsightMonthAccumulator>{};
+
+    for (final SwipeSessionRecord session in sessions) {
+      final DateTime monthStart = DateTime(
+        session.completedAt.year,
+        session.completedAt.month,
+      );
+      final _PulseInsightMonthAccumulator accumulator = accumulators
+          .putIfAbsent(monthStart, _PulseInsightMonthAccumulator.new);
+      accumulator.sessionCount += 1;
+      accumulator.acceptedEmotionCount += session.acceptedEmotions.length;
+
+      for (final String emotion in session.acceptedEmotions) {
+        final String normalized = emotion.trim();
+        if (normalized.isEmpty) {
+          continue;
+        }
+
+        accumulator.emotionCounts.update(
+          normalized,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
+
+    final List<PulseInsightMonthSummary> summaries = accumulators.entries
+        .map((entry) {
+          final DateTime monthStart = entry.key;
+          final _PulseInsightMonthAccumulator accumulator = entry.value;
+          return PulseInsightMonthSummary(
+            monthStart: monthStart,
+            label: _monthLabel(monthStart),
+            sessionCount: accumulator.sessionCount,
+            acceptedEmotionCount: accumulator.acceptedEmotionCount,
+            topEmotion: _topCountLabel(accumulator.emotionCounts),
+          );
+        })
+        .toList(growable: false);
+
+    summaries.sort((lhs, rhs) => lhs.monthStart.compareTo(rhs.monthStart));
+    return summaries;
+  }
+
+  static String? _topCountLabel(Map<String, int> counts) {
+    if (counts.isEmpty) {
+      return null;
+    }
+
+    final List<PulseInsightCount> ranked = counts.entries
+        .map((entry) => PulseInsightCount(label: entry.key, count: entry.value))
+        .toList(growable: false);
+
+    ranked.sort((lhs, rhs) {
+      final int countCompare = rhs.count.compareTo(lhs.count);
+      if (countCompare != 0) {
+        return countCompare;
+      }
+
+      return lhs.label.compareTo(rhs.label);
+    });
+
+    return ranked.first.label;
+  }
+
   static String _weekdayLabel(int weekday) {
     const List<String> weekdayNames = <String>[
       'Monday',
@@ -347,4 +566,29 @@ class PulseInsightsReport {
 
     return weekdayNames[weekday - 1];
   }
+
+  static String _monthLabel(DateTime monthStart) {
+    const List<String> monthNames = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    return '${monthNames[monthStart.month - 1]} ${monthStart.year}';
+  }
+}
+
+class _PulseInsightMonthAccumulator {
+  int sessionCount = 0;
+  int acceptedEmotionCount = 0;
+  final Map<String, int> emotionCounts = <String, int>{};
 }

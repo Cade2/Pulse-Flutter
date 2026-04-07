@@ -1199,6 +1199,99 @@ void main() {
     );
   });
 
+  testWidgets(
+    'insights screen shows the emotional year layer after thirty sessions',
+    (WidgetTester tester) async {
+      final List<SwipeSessionRecord> sessions = <SwipeSessionRecord>[
+        for (int index = 1; index <= 6; index++)
+          _buildSessionRecord(
+            date: '2026-01-${index.toString().padLeft(2, '0')}',
+            acceptedEmotions: const ['Calm', 'Joy'],
+            contextSocial: 'Friends',
+          ),
+        for (int index = 1; index <= 8; index++)
+          _buildSessionRecord(
+            date: '2026-02-${index.toString().padLeft(2, '0')}',
+            acceptedEmotions: const ['Focus', 'Hope'],
+            contextEnergy: 'Steady',
+          ),
+        for (int index = 1; index <= 10; index++)
+          _buildSessionRecord(
+            date: '2026-03-${index.toString().padLeft(2, '0')}',
+            acceptedEmotions: const ['Calm', 'Confidence'],
+            contextSleep: 'Good',
+          ),
+        for (int index = 1; index <= 6; index++)
+          _buildSessionRecord(
+            date: '2026-04-${index.toString().padLeft(2, '0')}',
+            acceptedEmotions: <String>[
+              'Calm',
+              if (index <= 2) 'Vulnerability' else 'Curiosity',
+            ],
+            contextSocial: 'Solo',
+            contextEnergy: 'High',
+            contextSleep: 'Late',
+          ),
+      ];
+      final _FakeSwipeSessionRepository fakeRepository =
+          _FakeSwipeSessionRepository(sessions: sessions);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => 'test-user'),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            currentUserProfileProvider.overrideWith(
+              (ref) => Stream.value(
+                _buildProfile(
+                  displayName: 'Ava',
+                  email: 'ava@example.com',
+                  avatarColour: '#EC4899',
+                ),
+              ),
+            ),
+            currentUserStreakProvider.overrideWith(
+              (ref) => const PulseStreak(
+                currentStreak: 6,
+                longestStreak: 10,
+                lastSessionDate: '2026-04-06',
+              ),
+            ),
+            currentUserLevelProgressProvider.overrideWith(
+              (ref) => const PulseLevelProgress(totalXp: 650, currentLevel: 7),
+            ),
+            currentSessionDateProvider.overrideWith(
+              (ref) => DateTime(2026, 4, 6),
+            ),
+            swipeSessionRepositoryProvider.overrideWith(
+              (ref) => fakeRepository,
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Insights'));
+      await tester.tap(find.text('Insights').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Emotional year'), findsOneWidget);
+      expect(find.text('4 active months tracked'), findsOneWidget);
+      expect(find.text('Rarest emotion'), findsOneWidget);
+      expect(find.text('Vulnerability'), findsWidgets);
+      expect(find.text('Recent month trend'), findsOneWidget);
+      expect(find.text('-4 sessions vs Mar 2026'), findsOneWidget);
+      expect(find.text('Monthly pulse trail'), findsOneWidget);
+      expect(find.text('Jan 2026'), findsOneWidget);
+      expect(find.text('Feb 2026'), findsOneWidget);
+      expect(find.text('Mar 2026'), findsWidgets);
+      expect(find.text('Apr 2026'), findsOneWidget);
+    },
+  );
+
   testWidgets('home shows done-for-today state when today already exists', (
     WidgetTester tester,
   ) async {

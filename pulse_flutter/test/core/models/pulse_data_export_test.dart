@@ -25,6 +25,11 @@ void main() {
       unlockedBadgeIds: const <String>['first-pulse', 'on-a-roll'],
       referralCode: PulseReferral.generateReferralCode('test-user'),
       referralCount: 3,
+      referredByUid: 'referrer-user',
+      referredByReferralCode: PulseReferral.generateReferralCode(
+        'referrer-user',
+      ),
+      referredAt: DateTime.utc(2026, 4, 2, 9),
       settings: const PulseProfileSettings(
         preferredReminderTime: '18:30',
         dailyRemindersEnabled: true,
@@ -85,6 +90,9 @@ void main() {
     expect(json['progress']['totalXp'], 180);
     expect(json['referral']['referralCode'], startsWith('PULSE'));
     expect(json['referral']['referralCount'], 3);
+    expect(json['referral']['referredByUid'], 'referrer-user');
+    expect(json['referral']['referredByReferralCode'], startsWith('PULSE'));
+    expect(json['referral']['referredAt'], '2026-04-02T09:00:00.000Z');
     expect(json['unlockedBadgeIds'], <dynamic>['first-pulse', 'on-a-roll']);
     expect(json['sessions'], hasLength(1));
     expect(json['sessions'][0]['sessionId'], '2026-04-21');

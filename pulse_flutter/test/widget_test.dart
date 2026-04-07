@@ -148,6 +148,68 @@ void main() {
     },
   );
 
+  testWidgets(
+    'login screen validates an optional referral code before account creation',
+    (WidgetTester tester) async {
+      final StreamController<PulseUserProfile?> profileController =
+          StreamController<PulseUserProfile?>.broadcast();
+      addTearDown(profileController.close);
+      final _FakeFirebaseAuthService fakeAuthService =
+          _FakeFirebaseAuthService();
+      final _FakeUserProfileRepository fakeUserProfileRepository =
+          _FakeUserProfileRepository(
+            initialProfile: _buildProfile(email: 'tester@example.com'),
+            profileController: profileController,
+          );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => null),
+            isAuthenticatedProvider.overrideWith((ref) => false),
+            firebaseAuthServiceProvider.overrideWithValue(fakeAuthService),
+            userProfileRepositoryProvider.overrideWithValue(
+              fakeUserProfileRepository,
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Start onboarding'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue to login'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).at(0),
+        'new@example.com',
+      );
+      await tester.enterText(find.byType(TextFormField).at(1), 'secret123');
+      await tester.enterText(
+        find.byKey(const Key('login-referral-code-field')),
+        'not-a-code',
+      );
+      final Finder createAccountButton = find.widgetWithText(
+        OutlinedButton,
+        'Create account',
+      );
+      await tester.ensureVisible(createAccountButton);
+      await tester.tap(createAccountButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Enter a valid Pulse referral code or leave it blank.'),
+        findsOneWidget,
+      );
+      expect(fakeAuthService.createAccountCalled, isFalse);
+      expect(fakeUserProfileRepository.lastValidatedReferralCode, isNull);
+    },
+  );
+
   testWidgets('signed-in users are routed to home', (
     WidgetTester tester,
   ) async {
@@ -2242,6 +2304,9 @@ PulseUserProfile _buildProfile({
   String? lastSessionDate,
   String? referralCode,
   int referralCount = PulseReferral.defaultReferralCount,
+  String? referredByUid,
+  String? referredByReferralCode,
+  DateTime? referredAt,
   PulseProfileSettings settings = const PulseProfileSettings(),
 }) {
   return PulseUserProfile(
@@ -2254,6 +2319,9 @@ PulseUserProfile _buildProfile({
     lastSessionDate: lastSessionDate,
     referralCode: referralCode,
     referralCount: referralCount,
+    referredByUid: referredByUid,
+    referredByReferralCode: referredByReferralCode,
+    referredAt: referredAt,
     settings: settings,
   );
 }
@@ -2382,6 +2450,8 @@ class _FakeWidgetNotificationTapSource
 
 class _FakeFirebaseAuthService implements FirebaseAuthService {
   bool signOutCalled = false;
+  bool signInCalled = false;
+  bool createAccountCalled = false;
   bool googleSignInCalled = false;
   bool appleSignInCalled = false;
   Object? googleSignInException;
@@ -2400,6 +2470,7 @@ class _FakeFirebaseAuthService implements FirebaseAuthService {
     required String email,
     required String password,
   }) {
+    createAccountCalled = true;
     throw UnimplementedError();
   }
 
@@ -2411,6 +2482,7 @@ class _FakeFirebaseAuthService implements FirebaseAuthService {
     required String email,
     required String password,
   }) {
+    signInCalled = true;
     throw UnimplementedError();
   }
 
@@ -2462,6 +2534,10 @@ class _FakeUserProfileRepository implements UserProfileRepository {
   String? lastDisplayName;
   String? lastAvatarColour;
   PulseProfileSettings? lastSettings;
+  String? lastValidatedReferralCode;
+  Object? validateReferralCodeException;
+  int ensureUserProfileCallCount = 0;
+  String? lastEnsureUserProfileReferralCode;
 
   @override
   Future<PulseUserProfile?> fetchUserProfile(String uid) async {
@@ -2474,7 +2550,18 @@ class _FakeUserProfileRepository implements UserProfileRepository {
   }
 
   @override
-  Future<void> ensureUserProfile(User user) async {}
+  Future<void> ensureUserProfile(User user, {String? referralCode}) async {
+    ensureUserProfileCallCount += 1;
+    lastEnsureUserProfileReferralCode = referralCode;
+  }
+
+  @override
+  Future<void> validateReferralCodeForRegistration(String referralCode) async {
+    lastValidatedReferralCode = referralCode;
+    if (validateReferralCodeException != null) {
+      throw validateReferralCodeException!;
+    }
+  }
 
   @override
   Future<void> updateProfile({
@@ -2500,6 +2587,9 @@ class _FakeUserProfileRepository implements UserProfileRepository {
       unlockedBadgeIds: _currentProfile.unlockedBadgeIds,
       referralCode: _currentProfile.referralCode,
       referralCount: _currentProfile.referralCount,
+      referredByUid: _currentProfile.referredByUid,
+      referredByReferralCode: _currentProfile.referredByReferralCode,
+      referredAt: _currentProfile.referredAt,
       settings: settings,
       createdAt: _currentProfile.createdAt,
       lastSeenAt: _currentProfile.lastSeenAt,

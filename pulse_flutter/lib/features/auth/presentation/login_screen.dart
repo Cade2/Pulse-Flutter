@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/firebase/firebase_auth_service.dart';
 import 'package:pulse_flutter/core/firebase/social_auth_clients.dart';
+import 'package:pulse_flutter/core/firestore/user_profile_repository.dart';
+import 'package:pulse_flutter/core/models/pulse_referral.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
@@ -21,6 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _referralCodeController = TextEditingController();
   static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   bool _isSubmitting = false;
@@ -31,6 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -41,40 +45,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    await _authenticate(
-      action,
-      (authService) {
-        if (action == _AuthAction.signIn) {
-          return authService.signInWithEmailAndPassword(
-            email: _emailController.text,
-            password: _passwordController.text,
-          );
-        }
-
-        return authService.createUserWithEmailAndPassword(
+    await _authenticate(action, (authService) {
+      if (action == _AuthAction.signIn) {
+        return authService.signInWithEmailAndPassword(
           email: _emailController.text,
           password: _passwordController.text,
         );
-      },
-    );
+      }
+
+      return authService.createUserWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+    });
   }
 
   Future<void> _submitSocialAuth(_AuthAction action) async {
-    await _authenticate(
-      action,
-      (authService) {
-        if (action == _AuthAction.googleSignIn) {
-          return authService.signInWithGoogle();
-        }
+    await _authenticate(action, (authService) {
+      if (action == _AuthAction.googleSignIn) {
+        return authService.signInWithGoogle();
+      }
 
-        return authService.signInWithApple();
-      },
-    );
+      return authService.signInWithApple();
+    });
   }
 
   Future<void> _authenticate(
     _AuthAction action,
-    Future<UserCredential> Function(FirebaseAuthService authService) authenticate,
+    Future<UserCredential> Function(FirebaseAuthService authService)
+    authenticate,
   ) async {
     FocusScope.of(context).unfocus();
 
@@ -89,6 +88,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final authService = ref.read(firebaseAuthServiceProvider);
       final userProfileRepository = ref.read(userProfileRepositoryProvider);
+      final String? referralCode = await _resolveReferralCodeForAction(
+        action,
+        userProfileRepository,
+      );
       final UserCredential userCredential = await authenticate(authService);
 
       didAuthenticate = true;
@@ -98,7 +101,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         throw StateError('Authentication completed without a user.');
       }
 
-      await userProfileRepository.ensureUserProfile(user);
+      await userProfileRepository.ensureUserProfile(
+        user,
+        referralCode: _shouldRedeemReferralCode(action, userCredential)
+            ? referralCode
+            : null,
+      );
 
       if (!mounted) {
         return;
@@ -106,6 +114,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       context.goNamed(AppRoutes.homeName);
     } on PulseSocialAuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _errorMessage = error.message;
+      });
+    } on PulseReferralRedemptionException catch (error) {
+      if (didAuthenticate) {
+        await _rollbackAuthenticatedSession();
+      }
+
       if (!mounted) {
         return;
       }
@@ -143,6 +163,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         });
       }
     }
+  }
+
+  Future<String?> _resolveReferralCodeForAction(
+    _AuthAction action,
+    UserProfileRepository userProfileRepository,
+  ) async {
+    if (action == _AuthAction.signIn) {
+      return null;
+    }
+
+    final String rawReferralCode = _referralCodeController.text.trim();
+    if (rawReferralCode.isEmpty) {
+      return null;
+    }
+
+    final String? normalizedReferralCode = PulseReferral.normalizeReferralCode(
+      rawReferralCode,
+    );
+    if (normalizedReferralCode == null) {
+      throw PulseReferralRedemptionException.invalidCode();
+    }
+
+    await userProfileRepository.validateReferralCodeForRegistration(
+      normalizedReferralCode,
+    );
+    return normalizedReferralCode;
+  }
+
+  bool _shouldRedeemReferralCode(
+    _AuthAction action,
+    UserCredential credential,
+  ) {
+    if (action == _AuthAction.signIn) {
+      return false;
+    }
+
+    if (_referralCodeController.text.trim().isEmpty) {
+      return false;
+    }
+
+    if (action == _AuthAction.createAccount) {
+      return true;
+    }
+
+    return credential.additionalUserInfo?.isNewUser ?? false;
   }
 
   Future<void> _rollbackAuthenticatedSession() async {
@@ -260,6 +325,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           _submitEmailAuth(_AuthAction.signIn);
                         }
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      key: const Key('login-referral-code-field'),
+                      controller: _referralCodeController,
+                      enabled: !_isSubmitting,
+                      textCapitalization: TextCapitalization.characters,
+                      textInputAction: TextInputAction.done,
+                      autocorrect: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Referral code (optional)',
+                        hintText: 'PULSE1234ABCD',
+                        helperText:
+                            'Only used when creating a new Pulse account.',
+                      ),
                     ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 16),

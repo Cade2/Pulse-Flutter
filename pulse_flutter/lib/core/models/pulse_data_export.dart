@@ -36,6 +36,9 @@ class PulseDataExport {
         'referralCount': PulseReferral.resolveReferralCount(
           profile.referralCount,
         ),
+        'referredByUid': profile.referredByUid,
+        'referredByReferralCode': profile.referredByReferralCode,
+        'referredAt': profile.referredAt?.toIso8601String(),
       },
       'unlockedBadgeIds': profile.unlockedBadgeIds,
       'sessions': sessions.map(_sessionToJson).toList(growable: false),

@@ -21,6 +21,15 @@ void main() {
     );
   });
 
+  test('normalizeReferralCode accepts trimmed lowercase input', () {
+    expect(
+      PulseReferral.normalizeReferralCode('  pulseabcd1234  '),
+      'PULSEABCD1234',
+    );
+    expect(PulseReferral.isValidReferralCode('PULSEABCD1234'), isTrue);
+    expect(PulseReferral.normalizeReferralCode('bad-code'), isNull);
+  });
+
   test('resolveReferralCount falls back for invalid values', () {
     expect(PulseReferral.resolveReferralCount(null), 0);
     expect(PulseReferral.resolveReferralCount(-1), 0);

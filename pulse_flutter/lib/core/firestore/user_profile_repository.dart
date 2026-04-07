@@ -40,13 +40,48 @@ class UserProfileRepository {
     });
   }
 
-  Future<void> ensureUserProfile(User user) async {
+  Future<void> ensureUserProfile(User user, {String? referralCode}) async {
+    final String? normalizedReferralCode = _normalizeOptionalReferralCode(
+      referralCode,
+    );
+    final _ReferralOwner? referralOwner = normalizedReferralCode == null
+        ? null
+        : await _findReferralOwner(normalizedReferralCode);
+
+    if (normalizedReferralCode != null && referralOwner == null) {
+      throw PulseReferralRedemptionException.notFound();
+    }
+
+    if (referralOwner?.uid == user.uid) {
+      throw PulseReferralRedemptionException.selfReferral();
+    }
+
     final docRef = userDocument(user.uid);
 
     await _firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(docRef);
       final Map<String, dynamic> existingData =
           snapshot.data() ?? <String, dynamic>{};
+      DocumentSnapshot<Map<String, dynamic>>? referrerSnapshot;
+      if (referralOwner != null) {
+        referrerSnapshot = await transaction.get(referralOwner.document);
+        if (!referrerSnapshot.exists) {
+          throw PulseReferralRedemptionException.notFound();
+        }
+
+        final String storedReferrerCode = _resolveReferralCode(
+          referrerSnapshot.data()?['referralCode'],
+          uid: referralOwner.uid,
+        );
+        if (storedReferrerCode != normalizedReferralCode) {
+          throw PulseReferralRedemptionException.notFound();
+        }
+
+        if (referrerSnapshot.id == user.uid) {
+          throw PulseReferralRedemptionException.selfReferral();
+        }
+      }
+
       final PulseUserProfile bootstrapProfile = PulseUserProfile.fromAuthUser(
         user,
       );
@@ -56,13 +91,22 @@ class UserProfileRepository {
       final PulseProfileSettings settings = _resolveSettings(
         existingData['settings'],
       );
-      final String referralCode = _resolveReferralCode(
+      final String ownReferralCode = _resolveReferralCode(
         existingData['referralCode'],
         uid: bootstrapProfile.uid,
       );
       final int referralCount = _resolveReferralCount(
         existingData['referralCount'],
       );
+      final String? existingReferredByUid = _trimToNull(
+        existingData['referredByUid'],
+      );
+      final String? existingReferredByReferralCode =
+          PulseReferral.normalizeReferralCode(
+            existingData['referredByReferralCode'],
+          );
+      final bool shouldRecordReferral =
+          referralOwner != null && existingReferredByUid == null;
 
       final Map<String, Object?> payload = <String, Object?>{
         'uid': bootstrapProfile.uid,
@@ -80,8 +124,16 @@ class UserProfileRepository {
         'unlockedBadgeIds': _resolveStoredBadgeIds(
           existingData['unlockedBadgeIds'],
         ),
-        'referralCode': referralCode,
+        'referralCode': ownReferralCode,
         'referralCount': referralCount,
+        if (shouldRecordReferral) ...<String, Object?>{
+          'referredByUid': referralOwner.uid,
+          'referredByReferralCode': normalizedReferralCode,
+          'referredAt': FieldValue.serverTimestamp(),
+        } else ...<String, Object?>{
+          'referredByUid': ?existingReferredByUid,
+          'referredByReferralCode': ?existingReferredByReferralCode,
+        },
         'settings': settings.toFirestore(),
         'lastSeenAt': FieldValue.serverTimestamp(),
       };
@@ -91,7 +143,29 @@ class UserProfileRepository {
       }
 
       transaction.set(docRef, payload, SetOptions(merge: true));
+
+      if (shouldRecordReferral && referrerSnapshot != null) {
+        final int referrerReferralCount = _resolveReferralCount(
+          referrerSnapshot.data()?['referralCount'],
+        );
+        transaction.set(referralOwner.document, <String, Object?>{
+          'referralCount': referrerReferralCount + 1,
+        }, SetOptions(merge: true));
+      }
     });
+  }
+
+  Future<void> validateReferralCodeForRegistration(String referralCode) async {
+    final String normalizedReferralCode = _normalizeRequiredReferralCode(
+      referralCode,
+    );
+    final _ReferralOwner? referralOwner = await _findReferralOwner(
+      normalizedReferralCode,
+    );
+
+    if (referralOwner == null) {
+      throw PulseReferralRedemptionException.notFound();
+    }
   }
 
   Future<void> updateProfile({
@@ -266,6 +340,40 @@ class UserProfileRepository {
     return PulseReferral.resolveReferralCount(existingValue);
   }
 
+  Future<_ReferralOwner?> _findReferralOwner(String referralCode) async {
+    final QuerySnapshot<Map<String, dynamic>> snapshot = await _usersCollection
+        .where('referralCode', isEqualTo: referralCode)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) {
+      return null;
+    }
+
+    final QueryDocumentSnapshot<Map<String, dynamic>> doc = snapshot.docs.first;
+    return _ReferralOwner(uid: doc.id, document: doc.reference);
+  }
+
+  String? _normalizeOptionalReferralCode(String? referralCode) {
+    final String? trimmedReferralCode = _trimToNull(referralCode);
+    if (trimmedReferralCode == null) {
+      return null;
+    }
+
+    return _normalizeRequiredReferralCode(trimmedReferralCode);
+  }
+
+  String _normalizeRequiredReferralCode(String referralCode) {
+    final String? normalizedReferralCode = PulseReferral.normalizeReferralCode(
+      referralCode,
+    );
+    if (normalizedReferralCode == null) {
+      throw PulseReferralRedemptionException.invalidCode();
+    }
+
+    return normalizedReferralCode;
+  }
+
   List<String> _resolveStoredBadgeIds(Object? value) {
     if (value is! List) {
       return const <String>[];
@@ -302,4 +410,11 @@ class UserProfileRepository {
 
     return trimmed;
   }
+}
+
+class _ReferralOwner {
+  const _ReferralOwner({required this.uid, required this.document});
+
+  final String uid;
+  final DocumentReference<Map<String, dynamic>> document;
 }

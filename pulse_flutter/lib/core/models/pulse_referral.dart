@@ -3,9 +3,24 @@ abstract final class PulseReferral {
   static const int defaultReferralCount = 0;
   static final RegExp _codePattern = RegExp(r'^PULSE[A-Z0-9]{8}$');
 
+  static String? normalizeReferralCode(Object? value) {
+    final String? candidate = _readNullableString(
+      value,
+    )?.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+    if (candidate == null || !_codePattern.hasMatch(candidate)) {
+      return null;
+    }
+
+    return candidate;
+  }
+
+  static bool isValidReferralCode(Object? value) {
+    return normalizeReferralCode(value) != null;
+  }
+
   static String resolveReferralCode(Object? value, {required String uid}) {
-    final String? storedCode = _readNullableString(value)?.toUpperCase();
-    if (storedCode != null && _codePattern.hasMatch(storedCode)) {
+    final String? storedCode = normalizeReferralCode(value);
+    if (storedCode != null) {
       return storedCode;
     }
 
@@ -14,7 +29,7 @@ abstract final class PulseReferral {
 
   static bool needsReferralCodeRepair(Object? value, {required String uid}) {
     final String normalized = resolveReferralCode(value, uid: uid);
-    final String? storedCode = _readNullableString(value)?.toUpperCase();
+    final String? storedCode = normalizeReferralCode(value);
     return storedCode != normalized;
   }
 
@@ -66,4 +81,31 @@ abstract final class PulseReferral {
 
     return trimmed;
   }
+}
+
+class PulseReferralRedemptionException implements Exception {
+  const PulseReferralRedemptionException._(this.message);
+
+  final String message;
+
+  factory PulseReferralRedemptionException.invalidCode() {
+    return const PulseReferralRedemptionException._(
+      'Enter a valid Pulse referral code or leave it blank.',
+    );
+  }
+
+  factory PulseReferralRedemptionException.notFound() {
+    return const PulseReferralRedemptionException._(
+      'We could not find that referral code. Check it or leave it blank.',
+    );
+  }
+
+  factory PulseReferralRedemptionException.selfReferral() {
+    return const PulseReferralRedemptionException._(
+      'You cannot use your own referral code.',
+    );
+  }
+
+  @override
+  String toString() => message;
 }

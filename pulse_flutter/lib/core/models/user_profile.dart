@@ -32,6 +32,9 @@ class PulseUserProfile {
     this.unlockedBadgeIds = const <String>[],
     this.referralCode,
     this.referralCount = PulseReferral.defaultReferralCount,
+    this.referredByUid,
+    this.referredByReferralCode,
+    this.referredAt,
     this.settings = const PulseProfileSettings(),
     this.createdAt,
     this.lastSeenAt,
@@ -49,6 +52,9 @@ class PulseUserProfile {
   final List<String> unlockedBadgeIds;
   final String? referralCode;
   final int referralCount;
+  final String? referredByUid;
+  final String? referredByReferralCode;
+  final DateTime? referredAt;
   final PulseProfileSettings settings;
   final DateTime? createdAt;
   final DateTime? lastSeenAt;
@@ -105,6 +111,9 @@ class PulseUserProfile {
       unlockedBadgeIds: unlockedBadgeIds,
       referralCode: referralCode,
       referralCount: referralCount,
+      referredByUid: referredByUid,
+      referredByReferralCode: referredByReferralCode,
+      referredAt: referredAt,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -125,6 +134,9 @@ class PulseUserProfile {
       unlockedBadgeIds: unlockedBadgeIds,
       referralCode: referralCode,
       referralCount: referralCount,
+      referredByUid: referredByUid,
+      referredByReferralCode: referredByReferralCode,
+      referredAt: referredAt,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -145,6 +157,9 @@ class PulseUserProfile {
       unlockedBadgeIds: PulseBadgeCatalog.sortedBadgeIds(unlockedBadgeIds),
       referralCode: referralCode,
       referralCount: referralCount,
+      referredByUid: referredByUid,
+      referredByReferralCode: referredByReferralCode,
+      referredAt: referredAt,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -165,6 +180,9 @@ class PulseUserProfile {
       unlockedBadgeIds: unlockedBadgeIds,
       referralCode: referralCode,
       referralCount: referralCount,
+      referredByUid: referredByUid,
+      referredByReferralCode: referredByReferralCode,
+      referredAt: referredAt,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -188,6 +206,9 @@ class PulseUserProfile {
       unlockedBadgeIds: unlockedBadgeIds,
       referralCode: referralCode,
       referralCount: referralCount,
+      referredByUid: referredByUid,
+      referredByReferralCode: referredByReferralCode,
+      referredAt: referredAt,
       settings: settings,
       createdAt: createdAt,
       lastSeenAt: lastSeenAt,
@@ -224,6 +245,11 @@ class PulseUserProfile {
         uid: snapshot.id,
       ),
       referralCount: PulseReferral.resolveReferralCount(data['referralCount']),
+      referredByUid: _readNullableString(data['referredByUid']),
+      referredByReferralCode: PulseReferral.normalizeReferralCode(
+        data['referredByReferralCode'],
+      ),
+      referredAt: _readTimestamp(data['referredAt']),
       settings: PulseProfileSettings.fromFirestoreData(data['settings']),
       createdAt: _readTimestamp(data['createdAt']),
       lastSeenAt: _readTimestamp(data['lastSeenAt']),
@@ -244,6 +270,9 @@ class PulseUserProfile {
       'unlockedBadgeIds': PulseBadgeCatalog.sortedBadgeIds(unlockedBadgeIds),
       'referralCode': PulseReferral.resolveReferralCode(referralCode, uid: uid),
       'referralCount': PulseReferral.resolveReferralCount(referralCount),
+      'referredByUid': referredByUid,
+      'referredByReferralCode': referredByReferralCode,
+      if (referredAt != null) 'referredAt': Timestamp.fromDate(referredAt!),
       'settings': settings.toFirestore(),
       if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
       if (lastSeenAt != null) 'lastSeenAt': Timestamp.fromDate(lastSeenAt!),

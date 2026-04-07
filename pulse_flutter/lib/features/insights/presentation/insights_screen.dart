@@ -7,6 +7,7 @@ import 'package:pulse_flutter/core/models/pulse_share_card_data.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/pulse_weekly_pulse_score.dart';
 import 'package:pulse_flutter/core/providers/insight_providers.dart';
+import 'package:pulse_flutter/core/providers/share_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
 class InsightsScreen extends ConsumerWidget {
@@ -40,6 +41,7 @@ class InsightsScreen extends ConsumerWidget {
                           key: const Key('open-share-card-button'),
                           onPressed: () => _showShareCardSheet(
                             context,
+                            ref,
                             PulseShareCardData.fromInsights(
                               report: report,
                               streak: streak,
@@ -138,6 +140,7 @@ class InsightsScreen extends ConsumerWidget {
 
   Future<void> _showShareCardSheet(
     BuildContext context,
+    WidgetRef ref,
     PulseShareCardData shareCardData,
   ) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
@@ -150,6 +153,21 @@ class InsightsScreen extends ConsumerWidget {
       builder: (sheetContext) {
         return _ShareCardSheet(
           data: shareCardData,
+          onShare: (boundaryKey, sharePositionOrigin) async {
+            await ref
+                .read(pulseShareCardShareServiceProvider)
+                .shareCard(
+                  boundaryKey: boundaryKey,
+                  data: shareCardData,
+                  sharePositionOrigin: sharePositionOrigin,
+                );
+
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('Pulse share card prepared for sharing.'),
+              ),
+            );
+          },
           onCopy: () async {
             await Clipboard.setData(
               ClipboardData(text: shareCardData.toShareText()),
@@ -1126,11 +1144,64 @@ class _InsightsCard extends StatelessWidget {
   }
 }
 
-class _ShareCardSheet extends StatelessWidget {
-  const _ShareCardSheet({required this.data, required this.onCopy});
+class _ShareCardSheet extends StatefulWidget {
+  const _ShareCardSheet({
+    required this.data,
+    required this.onShare,
+    required this.onCopy,
+  });
 
   final PulseShareCardData data;
+  final Future<void> Function(GlobalKey boundaryKey, Rect? sharePositionOrigin)
+  onShare;
   final Future<void> Function() onCopy;
+
+  @override
+  State<_ShareCardSheet> createState() => _ShareCardSheetState();
+}
+
+class _ShareCardSheetState extends State<_ShareCardSheet> {
+  final GlobalKey _shareCardBoundaryKey = GlobalKey();
+  bool _isSharing = false;
+  String? _shareErrorMessage;
+
+  Future<void> _handleSharePressed() async {
+    setState(() {
+      _isSharing = true;
+      _shareErrorMessage = null;
+    });
+
+    try {
+      final RenderObject? renderObject = context.findRenderObject();
+      final RenderBox? box = renderObject is RenderBox ? renderObject : null;
+      final Rect? sharePositionOrigin = box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size;
+
+      await widget.onShare(_shareCardBoundaryKey, sharePositionOrigin);
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _shareErrorMessage =
+            'Unable to share the Pulse card right now. You can still copy the text version.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSharing = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1161,22 +1232,61 @@ class _ShareCardSheet extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Preview the share card and copy a text version for now.',
+              'Preview the share card, share the image, or copy a text version.',
               style: textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: SingleChildScrollView(child: PulseShareCard(data: data)),
+              child: SingleChildScrollView(
+                child: RepaintBoundary(
+                  key: _shareCardBoundaryKey,
+                  child: PulseShareCard(data: widget.data),
+                ),
+              ),
             ),
+            if (_shareErrorMessage != null) ...[
+              const SizedBox(height: 12),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _shareErrorMessage!,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
+            FilledButton.icon(
+              key: const Key('share-card-image-button'),
+              onPressed: _isSharing ? null : _handleSharePressed,
+              icon: _isSharing
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.ios_share_rounded),
+              label: Text(
+                _isSharing ? 'Preparing share card...' : 'Share image',
+              ),
+            ),
+            const SizedBox(height: 12),
             FilledButton(
-              onPressed: onCopy,
+              onPressed: _isSharing ? null : widget.onCopy,
               child: const Text('Copy share text'),
             ),
             const SizedBox(height: 12),
             OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: _isSharing ? null : () => Navigator.of(context).pop(),
               child: const Text('Close'),
             ),
           ],

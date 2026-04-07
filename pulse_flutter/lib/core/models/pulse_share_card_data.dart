@@ -33,8 +33,9 @@ class PulseShareCardData {
     final List<PulseInsightCount> topEmotions = report.acceptedEmotionFrequency
         .take(3)
         .toList(growable: false);
-    final PulseInsightCount? topEmotion =
-        topEmotions.isEmpty ? null : topEmotions.first;
+    final PulseInsightCount? topEmotion = topEmotions.isEmpty
+        ? null
+        : topEmotions.first;
     final String streakLabel = switch (streak.currentStreak) {
       0 => 'No active streak yet',
       1 => '1-day streak',
@@ -55,7 +56,7 @@ class PulseShareCardData {
           '${report.totalSessions} ${report.totalSessions == 1 ? 'session' : 'sessions'} saved',
       topEmotionSummary: topEmotions.isEmpty
           ? 'No top emotions yet'
-          : topEmotions.map((emotion) => emotion.label).join(' • '),
+          : topEmotions.map((emotion) => emotion.label).join(' | '),
       topEmotions: topEmotions,
       trendLabel: report.weeklyScoreTrend?.label,
     );

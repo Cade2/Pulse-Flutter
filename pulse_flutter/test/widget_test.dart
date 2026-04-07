@@ -18,6 +18,7 @@ import 'package:pulse_flutter/core/models/pulse_insights.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/pulse_referral.dart';
+import 'package:pulse_flutter/core/models/pulse_share_card_data.dart';
 import 'package:pulse_flutter/core/models/pulse_session_history_entry.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
@@ -27,8 +28,10 @@ import 'package:pulse_flutter/core/notifications/pulse_push_message.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/account_providers.dart';
 import 'package:pulse_flutter/core/providers/messaging_providers.dart';
+import 'package:pulse_flutter/core/providers/share_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
+import 'package:pulse_flutter/core/sharing/pulse_share_card_share_service.dart';
 import 'package:pulse_flutter/features/swipe_session/models/emotion_card.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_record.dart';
 import 'package:pulse_flutter/features/swipe_session/models/swipe_session_reward_details.dart';
@@ -1206,7 +1209,102 @@ void main() {
     expect(find.text('Weekly Pulse Score'), findsWidgets);
     expect(find.text('Current streak'), findsWidgets);
     expect(find.text('Top emotions'), findsWidgets);
+    expect(find.text('Share image'), findsOneWidget);
     expect(find.text('Copy share text'), findsOneWidget);
+  });
+
+  testWidgets('insights share sheet triggers the native image share flow', (
+    WidgetTester tester,
+  ) async {
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(
+          sessions: [
+            _buildSessionRecord(
+              date: '2026-04-01',
+              acceptedEmotions: const ['Calm', 'Joy'],
+              contextSocial: 'Friends',
+              contextEnergy: 'Steady',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-03',
+              acceptedEmotions: const ['Calm'],
+              contextSocial: 'Friends',
+              contextSleep: 'Good',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-08',
+              acceptedEmotions: const ['Focus'],
+              contextEnergy: 'High',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-10',
+              acceptedEmotions: const ['Calm', 'Hope'],
+              contextSocial: 'Friends',
+              contextSleep: 'Good',
+            ),
+            _buildSessionRecord(
+              date: '2026-04-15',
+              acceptedEmotions: const ['Joy'],
+              contextSocial: 'Friends',
+              contextEnergy: 'Steady',
+            ),
+          ],
+        );
+    final _FakePulseShareCardShareService fakeShareService =
+        _FakePulseShareCardShareService();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 4,
+              longestStreak: 6,
+              lastSessionDate: '2026-04-15',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 15),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+          pulseShareCardShareServiceProvider.overrideWithValue(
+            fakeShareService,
+          ),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Insights'));
+    await tester.tap(find.text('Insights').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('open-share-card-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('share-card-image-button')));
+    await tester.pumpAndSettle();
+
+    expect(fakeShareService.shareCallCount, 1);
+    expect(fakeShareService.lastData?.title, 'My Pulse snapshot');
+    expect(fakeShareService.lastBoundaryHadContext, isTrue);
+    expect(find.text('Pulse share card prepared for sharing.'), findsOneWidget);
   });
 
   testWidgets('insights screen shows expanded patterns from saved history', (
@@ -2195,6 +2293,27 @@ SwipeSessionRecord _buildSessionRecord({
     contextSleep: contextSleep,
     completedAt: DateTime.parse('$date 12:00:00'),
   );
+}
+
+class _FakePulseShareCardShareService implements PulseShareCardShareService {
+  int shareCallCount = 0;
+  GlobalKey? lastBoundaryKey;
+  PulseShareCardData? lastData;
+  Rect? lastSharePositionOrigin;
+  bool lastBoundaryHadContext = false;
+
+  @override
+  Future<void> shareCard({
+    required GlobalKey boundaryKey,
+    required PulseShareCardData data,
+    Rect? sharePositionOrigin,
+  }) async {
+    shareCallCount += 1;
+    lastBoundaryKey = boundaryKey;
+    lastData = data;
+    lastSharePositionOrigin = sharePositionOrigin;
+    lastBoundaryHadContext = boundaryKey.currentContext != null;
+  }
 }
 
 class _FakeWidgetMessagingService implements PulseMessagingService {

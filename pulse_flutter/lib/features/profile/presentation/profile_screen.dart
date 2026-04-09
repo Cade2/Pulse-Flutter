@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
 import 'package:pulse_flutter/core/models/pulse_data_export.dart';
+import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
 import 'package:pulse_flutter/core/models/pulse_referral.dart';
+import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/account_providers.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
@@ -22,6 +24,20 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final TextEditingController _displayNameController = TextEditingController();
+  static const List<String> _monthNames = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
 
   bool _hasInitializedForm = false;
   bool _isSaving = false;
@@ -271,6 +287,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Future<void> _showPrivacyPolicySheet() async {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) => const _PrivacyPolicySheet(),
+    );
+  }
+
   Future<bool> _showDeleteAccountDialog() async {
     final bool? confirmed = await showDialog<bool>(
       context: context,
@@ -327,6 +353,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final AsyncValue<PulseUserProfile?> profileAsync = ref.watch(
       currentUserProfileProvider,
     );
+    final PulseStreak streak = ref.watch(currentUserStreakProvider);
+    final PulseLevelProgress levelProgress = ref.watch(
+      currentUserLevelProgressProvider,
+    );
     final TextTheme textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -338,7 +368,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               final String headline = _errorMessage == null
                   ? 'Profile unavailable'
                   : 'Account deletion incomplete';
-              final String body = _errorMessage ??
+              final String body =
+                  _errorMessage ??
                   'Your Pulse profile is not ready yet. Please try again in a moment.';
 
               if (_isDeletingAccount) {
@@ -403,6 +434,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             final String previewInitial = previewName
                 .substring(0, 1)
                 .toUpperCase();
+            final String accountSummary = _buildAccountSummary(profile);
+            final List<_ProfileSummaryStat> summaryStats =
+                <_ProfileSummaryStat>[
+                  _ProfileSummaryStat(
+                    label: 'Current streak',
+                    value: '${streak.currentStreak}',
+                    supportingText: streak.currentStreak == 1 ? 'day' : 'days',
+                  ),
+                  _ProfileSummaryStat(
+                    label: 'Best streak',
+                    value: '${streak.longestStreak}',
+                    supportingText: streak.longestStreak == 1 ? 'day' : 'days',
+                  ),
+                  _ProfileSummaryStat(
+                    label: 'Level',
+                    value: '${levelProgress.currentLevel}',
+                    supportingText: '${levelProgress.totalXp} XP',
+                  ),
+                  _ProfileSummaryStat(
+                    label: 'Badges',
+                    value: '${profile.unlockedBadgeIds.length}',
+                    supportingText: profile.unlockedBadgeIds.length == 1
+                        ? 'unlocked'
+                        : 'unlocked',
+                  ),
+                ];
 
             return Align(
               alignment: Alignment.topCenter,
@@ -431,6 +488,39 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         profile.email,
                         style: textTheme.bodyMedium,
                         textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        accountSummary,
+                        style: textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      _ProfileSectionCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Account snapshot',
+                              style: textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'A quick view of the Pulse progress already tied to your account.',
+                              style: textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 20),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: summaryStats
+                                  .map((stat) {
+                                    return _ProfileSummaryStatCard(stat: stat);
+                                  })
+                                  .toList(growable: false),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 32),
                       _ProfileSectionCard(
@@ -675,9 +765,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   label: const Text('Share invite'),
                                 ),
                                 OutlinedButton.icon(
-                                  key: const Key(
-                                    'profile-view-friends-button',
-                                  ),
+                                  key: const Key('profile-view-friends-button'),
                                   onPressed: _isBusy
                                       ? null
                                       : () => context.goNamed(
@@ -734,6 +822,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             ? null
                             : () => context.goNamed(AppRoutes.badgesName),
                         child: const Text('View badges'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        key: const Key('profile-privacy-policy-button'),
+                        onPressed: _isBusy ? null : _showPrivacyPolicySheet,
+                        icon: const Icon(Icons.privacy_tip_rounded),
+                        label: const Text('Privacy policy'),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
@@ -839,6 +934,39 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
     );
   }
+
+  String _buildAccountSummary(PulseUserProfile profile) {
+    final List<String> parts = <String>[];
+    final DateTime? createdAt = profile.createdAt;
+    if (createdAt != null) {
+      parts.add(
+        'Member since ${_monthNames[createdAt.month - 1]} ${createdAt.year}',
+      );
+    }
+
+    if (profile.referredByUid != null ||
+        profile.referredByReferralCode != null) {
+      parts.add('Joined through a Pulse invite');
+    }
+
+    if (parts.isEmpty) {
+      return 'Your Pulse account is ready for daily check-ins, progress tracking, and exports.';
+    }
+
+    return parts.join(' | ');
+  }
+}
+
+class _ProfileSummaryStat {
+  const _ProfileSummaryStat({
+    required this.label,
+    required this.value,
+    required this.supportingText,
+  });
+
+  final String label;
+  final String value;
+  final String supportingText;
 }
 
 class _DeleteAccountDialog extends StatefulWidget {
@@ -959,6 +1087,44 @@ class _ProfileMessageCard extends StatelessWidget {
             context,
           ).textTheme.bodyMedium?.copyWith(color: foregroundColor),
           textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSummaryStatCard extends StatelessWidget {
+  const _ProfileSummaryStatCard({required this.stat});
+
+  final _ProfileSummaryStat stat;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(stat.label, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 8),
+              Text(
+                stat.value,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                stat.supportingText,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1101,6 +1267,115 @@ class _ReferralShareSheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PrivacyPolicySheet extends StatelessWidget {
+  const _PrivacyPolicySheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return FractionallySizedBox(
+      heightFactor: 0.82,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Pulse privacy policy',
+              style: textTheme.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This launch-ready summary reflects the Pulse data the app currently stores and uses.',
+              style: textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: const [
+                      _PrivacyPolicySection(
+                        title: 'What Pulse stores',
+                        body:
+                            'Pulse stores your account profile, reminder settings, saved session history, streak and XP progress, unlocked badges, referrals, and messaging token data needed for the current app features.',
+                      ),
+                      SizedBox(height: 16),
+                      _PrivacyPolicySection(
+                        title: 'Why Pulse uses it',
+                        body:
+                            'This data keeps sign-in, daily sessions, reminders, insights, progress, social comparisons, and account recovery working across devices.',
+                      ),
+                      SizedBox(height: 16),
+                      _PrivacyPolicySection(
+                        title: 'Your controls',
+                        body:
+                            'You can export your current Pulse data from Profile at any time, and you can remove your Pulse-owned Firestore data with the delete-account flow.',
+                      ),
+                      SizedBox(height: 16),
+                      _PrivacyPolicySection(
+                        title: 'Offline and device data',
+                        body:
+                            'When the app is offline, Pulse can temporarily queue pending session data locally so it can sync cleanly once connectivity returns.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrivacyPolicySection extends StatelessWidget {
+  const _PrivacyPolicySection({required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: textTheme.titleMedium),
+        const SizedBox(height: 6),
+        Text(body, style: textTheme.bodyMedium),
+      ],
     );
   }
 }

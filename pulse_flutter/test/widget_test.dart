@@ -591,6 +591,10 @@ void main() {
     expect(_selectedBottomNavIndex(tester), 4);
     expect(find.text('Profile'), findsWidgets);
     expect(find.text('ava@example.com'), findsOneWidget);
+    expect(find.text('Account snapshot'), findsOneWidget);
+    expect(find.text('Current streak'), findsOneWidget);
+    expect(find.text('Best streak'), findsOneWidget);
+    expect(find.text('Badges'), findsWidgets);
     expect(find.text('Profile basics'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Reminder time'), findsOneWidget);
@@ -600,8 +604,54 @@ void main() {
     expect(find.text('Copy code'), findsOneWidget);
     expect(find.text('Share invite'), findsOneWidget);
     expect(find.text('View friends'), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
     expect(find.text('Save changes'), findsOneWidget);
     expect(find.text('Ava'), findsWidgets);
+  });
+
+  testWidgets('profile privacy policy sheet opens from profile', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith((ref) => const PulseStreak()),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Profile'));
+    await tester.tap(find.text('Profile').last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('profile-privacy-policy-button')),
+    );
+    await tester.tap(find.byKey(const Key('profile-privacy-policy-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pulse privacy policy'), findsOneWidget);
+    expect(find.text('What Pulse stores'), findsOneWidget);
+    expect(find.text('Your controls'), findsOneWidget);
+    expect(find.text('Offline and device data'), findsOneWidget);
   });
 
   testWidgets('profile referral section shows code and opens invite share', (

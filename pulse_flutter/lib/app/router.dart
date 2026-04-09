@@ -9,6 +9,7 @@ import 'package:pulse_flutter/features/badges/presentation/badges_screen.dart';
 import 'package:pulse_flutter/features/home/presentation/home_screen.dart';
 import 'package:pulse_flutter/features/history/presentation/history_screen.dart';
 import 'package:pulse_flutter/features/insights/presentation/insights_screen.dart';
+import 'package:pulse_flutter/features/insights/presentation/mood_market_screen.dart';
 import 'package:pulse_flutter/features/leaderboard/presentation/leaderboard_screen.dart';
 import 'package:pulse_flutter/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pulse_flutter/features/profile/presentation/profile_screen.dart';
@@ -46,6 +47,9 @@ abstract final class AppRoutes {
 
   static const String insightsName = 'insights';
   static const String insightsPath = '/insights';
+
+  static const String moodMarketName = 'mood-market';
+  static const String moodMarketPath = '/insights/mood-market';
 
   static const String swipeSessionName = 'swipe-session';
   static const String swipeSessionPath = '/session';
@@ -172,6 +176,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.insightsPath,
             name: AppRoutes.insightsName,
             builder: (context, state) => const InsightsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.moodMarketPath,
+            name: AppRoutes.moodMarketName,
+            builder: (context, state) => const MoodMarketScreen(),
           ),
           GoRoute(
             path: AppRoutes.badgesPath,

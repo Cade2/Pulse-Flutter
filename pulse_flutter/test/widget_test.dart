@@ -1369,6 +1369,109 @@ void main() {
     expect(find.text('Pulse share card prepared for sharing.'), findsOneWidget);
   });
 
+  testWidgets('insights screen opens the MoodMarket story flow', (
+    WidgetTester tester,
+  ) async {
+    final List<SwipeSessionRecord> sessions = <SwipeSessionRecord>[
+      _buildSessionRecord(
+        date: '2026-01-03',
+        acceptedEmotions: const ['Calm', 'Joy'],
+        contextSocial: 'Friends',
+        contextEnergy: 'Steady',
+      ),
+      _buildSessionRecord(
+        date: '2026-01-10',
+        acceptedEmotions: const ['Calm'],
+        contextSocial: 'Friends',
+        contextSleep: 'Good',
+      ),
+      _buildSessionRecord(
+        date: '2026-02-02',
+        acceptedEmotions: const ['Focus', 'Hope'],
+        contextEnergy: 'High',
+      ),
+      _buildSessionRecord(
+        date: '2026-03-15',
+        acceptedEmotions: const ['Focus', 'Focus'],
+        contextSocial: 'Solo',
+        contextEnergy: 'High',
+        contextSleep: 'Late',
+      ),
+      _buildSessionRecord(
+        date: '2026-04-01',
+        acceptedEmotions: const ['Focus', 'Curiosity'],
+        contextSocial: 'Solo',
+        contextEnergy: 'High',
+      ),
+    ];
+    final _FakeSwipeSessionRepository fakeRepository =
+        _FakeSwipeSessionRepository(sessions: sessions);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Ava',
+                email: 'ava@example.com',
+                avatarColour: '#EC4899',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 3,
+              longestStreak: 6,
+              lastSessionDate: '2026-04-01',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(),
+          ),
+          currentSessionDateProvider.overrideWith(
+            (ref) => DateTime(2026, 4, 1),
+          ),
+          swipeSessionRepositoryProvider.overrideWith((ref) => fakeRepository),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Insights'));
+    await tester.tap(find.text('Insights').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('open-mood-market-button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('open-mood-market-button')));
+    await tester.pumpAndSettle();
+
+    expect(_selectedBottomNavIndex(tester), 2);
+    expect(find.text('MoodMarket'), findsWidgets);
+    expect(find.text('Your Pulse Wrapped'), findsOneWidget);
+    expect(find.text('Your Pulse story'), findsOneWidget);
+    expect(find.text('Jan - Apr 2026'), findsOneWidget);
+    expect(find.text('5 sessions across 4 active months'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('mood-market-next-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Top emotions'), findsOneWidget);
+    expect(find.text('Focus'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('mood-market-next-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Shifts and turns'), findsOneWidget);
+    expect(find.text('From Calm to Focus'), findsOneWidget);
+  });
+
   testWidgets('insights screen shows expanded patterns from saved history', (
     WidgetTester tester,
   ) async {

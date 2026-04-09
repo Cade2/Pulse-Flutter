@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/components/pulse_share_card.dart';
+import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/models/pulse_insights.dart';
 import 'package:pulse_flutter/core/models/pulse_share_card_data.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
@@ -37,18 +39,32 @@ class InsightsScreen extends ConsumerWidget {
                     children: [
                       Align(
                         alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          key: const Key('open-share-card-button'),
-                          onPressed: () => _showShareCardSheet(
-                            context,
-                            ref,
-                            PulseShareCardData.fromInsights(
-                              report: report,
-                              streak: streak,
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          alignment: WrapAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              key: const Key('open-mood-market-button'),
+                              onPressed: () =>
+                                  context.goNamed(AppRoutes.moodMarketName),
+                              icon: const Icon(Icons.auto_awesome_rounded),
+                              label: const Text('Open MoodMarket'),
                             ),
-                          ),
-                          icon: const Icon(Icons.ios_share_rounded),
-                          label: const Text('Share snapshot'),
+                            OutlinedButton.icon(
+                              key: const Key('open-share-card-button'),
+                              onPressed: () => _showShareCardSheet(
+                                context,
+                                ref,
+                                PulseShareCardData.fromInsights(
+                                  report: report,
+                                  streak: streak,
+                                ),
+                              ),
+                              icon: const Icon(Icons.ios_share_rounded),
+                              label: const Text('Share snapshot'),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),

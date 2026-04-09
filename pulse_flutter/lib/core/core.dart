@@ -14,6 +14,7 @@ export 'models/user_profile.dart';
 export 'models/pulse_badge.dart';
 export 'models/pulse_data_export.dart';
 export 'models/pulse_insights.dart';
+export 'models/pulse_mood_market.dart';
 export 'models/pulse_leaderboard.dart';
 export 'models/pulse_streak.dart';
 export 'models/pulse_level_progress.dart';

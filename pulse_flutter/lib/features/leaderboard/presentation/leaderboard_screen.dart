@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
 import 'package:pulse_flutter/core/models/pulse_leaderboard.dart';
@@ -6,6 +7,39 @@ import 'package:pulse_flutter/core/providers/leaderboard_providers.dart';
 
 class LeaderboardScreen extends ConsumerWidget {
   const LeaderboardScreen({super.key});
+
+  Future<void> _showChallengeSheet(
+    BuildContext context,
+    PulseLeaderboardChallengeDraft challenge,
+  ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
+    return showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) {
+        return _LeaderboardChallengeSheet(
+          challenge: challenge,
+          onCopy: () async {
+            await Clipboard.setData(ClipboardData(text: challenge.shareText));
+
+            if (!sheetContext.mounted) {
+              return;
+            }
+
+            Navigator.of(sheetContext).pop();
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('Challenge text copied to clipboard.'),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -72,7 +106,15 @@ class LeaderboardScreen extends ConsumerWidget {
                         ...leaderboard.friendEntries.map((entry) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: _LeaderboardRow(entry: entry),
+                            child: _LeaderboardRow(
+                              entry: entry,
+                              onChallenge: entry.canChallenge
+                                  ? () => _showChallengeSheet(
+                                      context,
+                                      leaderboard.challengeFor(entry),
+                                    )
+                                  : null,
+                            ),
                           );
                         }),
                     ],
@@ -124,9 +166,12 @@ class _LeaderboardSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final TextTheme textTheme = theme.textTheme;
-    final String referralLabel = leaderboard.referralCount == 1
-        ? '1 friend join ready'
-        : '${leaderboard.referralCount} friend joins ready';
+    final String standingLabel = leaderboard.hasFriends
+        ? '#${leaderboard.currentUserEntry.rank} of ${leaderboard.totalVisibleEntries}'
+        : 'Circle ready';
+    final String friendsLabel = leaderboard.friendEntries.length == 1
+        ? '1 real connection'
+        : '${leaderboard.friendEntries.length} real connections';
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -140,20 +185,22 @@ class _LeaderboardSummaryCard extends StatelessWidget {
           children: [
             Text('Your Pulse circle', style: textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text(
-              referralLabel,
-              style: textTheme.headlineMedium,
+            Text(standingLabel, style: textTheme.headlineMedium),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _LeaderboardStatChip(label: friendsLabel),
+                _LeaderboardStatChip(
+                  label: 'Referral code ${leaderboard.referralCode}',
+                ),
+              ],
             ),
+            const SizedBox(height: 16),
+            Text(leaderboard.relationshipSummary, style: textTheme.bodyMedium),
             const SizedBox(height: 8),
-            Text(
-              'Referral code ${leaderboard.referralCode}',
-              style: textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'This scaffold keeps your spot ready for future friends, rankings, and shared streak challenges.',
-              style: textTheme.bodyMedium,
-            ),
+            Text(leaderboard.competitionSummary, style: textTheme.bodyMedium),
           ],
         ),
       ),
@@ -162,9 +209,10 @@ class _LeaderboardSummaryCard extends StatelessWidget {
 }
 
 class _LeaderboardRow extends StatelessWidget {
-  const _LeaderboardRow({required this.entry});
+  const _LeaderboardRow({required this.entry, this.onChallenge});
 
   final PulseLeaderboardEntry entry;
+  final VoidCallback? onChallenge;
 
   @override
   Widget build(BuildContext context) {
@@ -200,10 +248,8 @@ class _LeaderboardRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(entry.name, style: textTheme.titleMedium),
-                  if (entry.subtitle != null) ...[
-                    const SizedBox(height: 4),
-                    Text(entry.subtitle!, style: textTheme.bodySmall),
-                  ],
+                  const SizedBox(height: 4),
+                  Text(entry.subtitle, style: textTheme.bodySmall),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
@@ -220,6 +266,15 @@ class _LeaderboardRow extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (onChallenge != null) ...[
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      key: Key('leaderboard-challenge-${entry.uid}'),
+                      onPressed: onChallenge,
+                      icon: const Icon(Icons.flag_rounded),
+                      label: const Text('Challenge'),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -254,7 +309,9 @@ class _LeaderboardEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Invite friends with referral code $referralCode and their rows will appear here once Pulse friend joins are live.',
+              'Invite someone with referral code $referralCode or join Pulse '
+              'through a friend code. Real connection rows will appear here '
+              'as soon as those referral relationships exist.',
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -280,6 +337,106 @@ class _LeaderboardStatChip extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ),
+    );
+  }
+}
+
+class _LeaderboardChallengeSheet extends StatelessWidget {
+  const _LeaderboardChallengeSheet({
+    required this.challenge,
+    required this.onCopy,
+  });
+
+  final PulseLeaderboardChallengeDraft challenge;
+  final Future<void> Function() onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return FractionallySizedBox(
+      heightFactor: 0.8,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Challenge ${challenge.friendName}',
+              style: textTheme.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              challenge.headline,
+              style: textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              challenge.summary,
+              style: textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Race to ${challenge.targetStreak} days',
+                          style: textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          challenge.currentUserStatus,
+                          style: textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          challenge.friendStatus,
+                          style: textTheme.bodyLarge,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: onCopy,
+              child: const Text('Copy challenge text'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
       ),
     );
   }

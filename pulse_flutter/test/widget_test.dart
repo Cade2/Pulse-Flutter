@@ -666,6 +666,21 @@ void main() {
       final String referralCode = PulseReferral.generateReferralCode(
         'test-user',
       );
+      final StreamController<PulseUserProfile?> profileController =
+          StreamController<PulseUserProfile?>.broadcast();
+      addTearDown(profileController.close);
+      final PulseUserProfile profile = _buildProfile(
+        displayName: 'Ava',
+        email: 'ava@example.com',
+        avatarColour: '#EC4899',
+        referralCode: referralCode,
+        referralCount: 0,
+      );
+      final _FakeUserProfileRepository fakeRepository =
+          _FakeUserProfileRepository(
+            initialProfile: profile,
+            profileController: profileController,
+          );
 
       await tester.pumpWidget(
         ProviderScope(
@@ -674,16 +689,9 @@ void main() {
             currentUserIdProvider.overrideWith((ref) => 'test-user'),
             isAuthenticatedProvider.overrideWith((ref) => true),
             currentUserProfileProvider.overrideWith(
-              (ref) => Stream.value(
-                _buildProfile(
-                  displayName: 'Ava',
-                  email: 'ava@example.com',
-                  avatarColour: '#EC4899',
-                  referralCode: referralCode,
-                  referralCount: 0,
-                ),
-              ),
+              (ref) => Stream.value(profile),
             ),
+            userProfileRepositoryProvider.overrideWithValue(fakeRepository),
             currentUserStreakProvider.overrideWith(
               (ref) => const PulseStreak(
                 currentStreak: 4,
@@ -720,6 +728,114 @@ void main() {
       expect(find.text('Ava'), findsOneWidget);
       expect(find.text('4 day streak'), findsOneWidget);
       expect(find.text('Level 2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'friends leaderboard shows real referral-circle rows and opens challenge sheet',
+    (WidgetTester tester) async {
+      final StreamController<PulseUserProfile?> profileController =
+          StreamController<PulseUserProfile?>.broadcast();
+      addTearDown(profileController.close);
+      final PulseUserProfile profile = _buildProfile(
+        uid: 'test-user',
+        displayName: 'Ava',
+        email: 'ava@example.com',
+        avatarColour: '#EC4899',
+        currentStreak: 4,
+        longestStreak: 7,
+        referralCount: 1,
+        referredByUid: 'mentor-user',
+      );
+      final _FakeUserProfileRepository fakeRepository =
+          _FakeUserProfileRepository(
+            initialProfile: profile,
+            profileController: profileController,
+            socialProfiles: <PulseUserProfile>[
+              _buildProfile(
+                uid: 'mentor-user',
+                displayName: 'Milo',
+                email: 'milo@example.com',
+                avatarColour: '#10B981',
+                currentStreak: 6,
+                longestStreak: 9,
+                totalXp: 360,
+                currentLevel: 4,
+                referralCount: 2,
+              ),
+              _buildProfile(
+                uid: 'friend-user',
+                displayName: 'Noah',
+                email: 'noah@example.com',
+                avatarColour: '#F59E0B',
+                currentStreak: 5,
+                longestStreak: 5,
+                totalXp: 210,
+                currentLevel: 3,
+                referralCount: 0,
+                referredByUid: 'test-user',
+              ),
+            ],
+          );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => null),
+            currentUserIdProvider.overrideWith((ref) => 'test-user'),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            currentUserProfileProvider.overrideWith(
+              (ref) => Stream.value(profile),
+            ),
+            userProfileRepositoryProvider.overrideWithValue(fakeRepository),
+            currentUserStreakProvider.overrideWith(
+              (ref) => const PulseStreak(
+                currentStreak: 4,
+                longestStreak: 7,
+                lastSessionDate: '2026-04-05',
+              ),
+            ),
+            currentUserLevelProgressProvider.overrideWith(
+              (ref) => const PulseLevelProgress(totalXp: 180, currentLevel: 2),
+            ),
+          ],
+          child: const PulseApp(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Profile'));
+      await tester.tap(find.text('Profile').last);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('profile-view-friends-button')),
+      );
+      await tester.tap(find.byKey(const Key('profile-view-friends-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Milo'), findsOneWidget);
+      expect(find.text('Noah'), findsOneWidget);
+      expect(find.text('Invited you to Pulse'), findsOneWidget);
+      expect(find.text('Joined with your code'), findsOneWidget);
+      expect(
+        find.byKey(const Key('leaderboard-challenge-friend-user')),
+        findsOneWidget,
+      );
+
+      await tester.ensureVisible(
+        find.byKey(const Key('leaderboard-challenge-friend-user')),
+      );
+      await tester.tap(
+        find.byKey(const Key('leaderboard-challenge-friend-user')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Challenge Noah'), findsOneWidget);
+      expect(find.text('Race to 7 days'), findsOneWidget);
+      expect(find.text('Copy challenge text'), findsOneWidget);
+      expect(find.textContaining('Noah is 1 day ahead'), findsOneWidget);
     },
   );
 
@@ -2400,11 +2516,14 @@ void main() {
 
 PulseUserProfile _buildProfile({
   required String email,
+  String uid = 'test-user',
   String? displayName,
   String avatarColour = PulseUserProfile.defaultAvatarColour,
   int currentStreak = 0,
   int longestStreak = 0,
   String? lastSessionDate,
+  int totalXp = 0,
+  int currentLevel = 1,
   String? referralCode,
   int referralCount = PulseReferral.defaultReferralCount,
   String? referredByUid,
@@ -2413,13 +2532,15 @@ PulseUserProfile _buildProfile({
   PulseProfileSettings settings = const PulseProfileSettings(),
 }) {
   return PulseUserProfile(
-    uid: 'test-user',
+    uid: uid,
     email: email,
     displayName: displayName,
     avatarColour: avatarColour,
     currentStreak: currentStreak,
     longestStreak: longestStreak,
     lastSessionDate: lastSessionDate,
+    totalXp: totalXp,
+    currentLevel: currentLevel,
     referralCode: referralCode,
     referralCount: referralCount,
     referredByUid: referredByUid,
@@ -2628,11 +2749,14 @@ class _FakeUserProfileRepository implements UserProfileRepository {
   _FakeUserProfileRepository({
     required PulseUserProfile initialProfile,
     required StreamController<PulseUserProfile?> profileController,
+    List<PulseUserProfile> socialProfiles = const <PulseUserProfile>[],
   }) : _currentProfile = initialProfile,
-       _profileController = profileController;
+       _profileController = profileController,
+       socialProfiles = List<PulseUserProfile>.from(socialProfiles);
 
   PulseUserProfile _currentProfile;
   final StreamController<PulseUserProfile?> _profileController;
+  final List<PulseUserProfile> socialProfiles;
   String? lastUpdatedUid;
   String? lastDisplayName;
   String? lastAvatarColour;
@@ -2641,10 +2765,29 @@ class _FakeUserProfileRepository implements UserProfileRepository {
   Object? validateReferralCodeException;
   int ensureUserProfileCallCount = 0;
   String? lastEnsureUserProfileReferralCode;
+  String? lastReferralCircleUid;
 
   @override
   Future<PulseUserProfile?> fetchUserProfile(String uid) async {
-    return _currentProfile;
+    if (uid == _currentProfile.uid) {
+      return _currentProfile;
+    }
+
+    for (final PulseUserProfile socialProfile in socialProfiles) {
+      if (socialProfile.uid == uid) {
+        return socialProfile;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Future<List<PulseUserProfile>> fetchReferralCircleProfiles(
+    PulseUserProfile profile,
+  ) async {
+    lastReferralCircleUid = profile.uid;
+    return List<PulseUserProfile>.from(socialProfiles);
   }
 
   @override

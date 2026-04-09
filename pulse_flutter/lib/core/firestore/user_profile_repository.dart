@@ -181,6 +181,41 @@ class UserProfileRepository {
     }, SetOptions(merge: true));
   }
 
+  Future<List<PulseUserProfile>> fetchReferralCircleProfiles(
+    PulseUserProfile profile,
+  ) async {
+    final List<PulseUserProfile> socialProfiles = <PulseUserProfile>[];
+    final Set<String> seenUids = <String>{profile.uid};
+
+    final String? referredByUid = profile.referredByUid;
+    if (referredByUid != null && referredByUid.isNotEmpty) {
+      final PulseUserProfile? referrerProfile = await fetchUserProfile(
+        referredByUid,
+      );
+      if (referrerProfile != null && seenUids.add(referrerProfile.uid)) {
+        socialProfiles.add(referrerProfile);
+      }
+    }
+
+    final QuerySnapshot<Map<String, dynamic>> referredUsersSnapshot =
+        await _usersCollection
+            .where('referredByUid', isEqualTo: profile.uid)
+            .get();
+    final List<PulseUserProfile> referredProfiles = await Future.wait(
+      referredUsersSnapshot.docs.map((snapshot) {
+        return _buildReconciledProfile(uid: snapshot.id, snapshot: snapshot);
+      }),
+    );
+
+    for (final PulseUserProfile referredProfile in referredProfiles) {
+      if (seenUids.add(referredProfile.uid)) {
+        socialProfiles.add(referredProfile);
+      }
+    }
+
+    return socialProfiles;
+  }
+
   Future<PulseUserProfile> _buildReconciledProfile({
     required String uid,
     required DocumentSnapshot<Map<String, dynamic>> snapshot,

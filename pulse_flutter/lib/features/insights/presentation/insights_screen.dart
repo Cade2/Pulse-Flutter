@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/components/pulse_share_card.dart';
+import 'package:pulse_flutter/components/pulse_state_views.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/core/models/pulse_insights.dart';
 import 'package:pulse_flutter/core/models/pulse_share_card_data.dart';
 import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/pulse_weekly_pulse_score.dart';
+import 'package:pulse_flutter/core/providers/connectivity_providers.dart';
 import 'package:pulse_flutter/core/providers/insight_providers.dart';
 import 'package:pulse_flutter/core/providers/share_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -20,8 +22,8 @@ class InsightsScreen extends ConsumerWidget {
     final AsyncValue<PulseInsightsReport> insightsAsync = ref.watch(
       currentUserInsightsProvider,
     );
+    final bool isOffline = ref.watch(isOfflineProvider);
     final PulseStreak streak = ref.watch(currentUserStreakProvider);
-    final TextTheme textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Insights')),
@@ -121,32 +123,21 @@ class InsightsScreen extends ConsumerWidget {
               ),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const _InsightsLoadingState(),
           error: (error, stackTrace) {
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Unable to load insights',
-                        style: textTheme.headlineLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Please try again in a moment.',
-                        style: textTheme.bodyLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            return PulseStatusView(
+              title: 'Unable to load insights',
+              message: isOffline
+                  ? 'You\'re offline, so Pulse can\'t refresh the latest insight patterns right now.'
+                  : 'Please try again in a moment.',
+              footnote: isOffline
+                  ? 'Your saved history remains on this device and richer insights will catch up when the connection returns.'
+                  : null,
+              icon: isOffline
+                  ? Icons.cloud_off_rounded
+                  : Icons.insights_outlined,
+              actionLabel: 'Try again',
+              onAction: () => ref.invalidate(currentUserInsightsProvider),
             );
           },
         ),
@@ -200,6 +191,51 @@ class InsightsScreen extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _InsightsLoadingState extends StatelessWidget {
+  const _InsightsLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: const [
+              PulseLoadingCard(
+                titleWidthFactor: 0.28,
+                lineWidthFactors: <double>[0.38, 0.62],
+                height: 112,
+              ),
+              SizedBox(height: 16),
+              PulseLoadingCard(
+                titleWidthFactor: 0.34,
+                lineWidthFactors: <double>[0.3, 0.48],
+                height: 116,
+              ),
+              SizedBox(height: 16),
+              PulseLoadingCard(
+                titleWidthFactor: 0.4,
+                lineWidthFactors: <double>[0.32, 0.66, 0.52],
+                height: 144,
+              ),
+              SizedBox(height: 16),
+              PulseLoadingCard(
+                titleWidthFactor: 0.26,
+                lineWidthFactors: <double>[0.92, 0.76, 0.54],
+                height: 172,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

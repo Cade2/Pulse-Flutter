@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/app.dart';
 import 'package:pulse_flutter/app/router.dart';
+import 'package:pulse_flutter/core/connectivity/pulse_connectivity_service.dart';
 import 'package:pulse_flutter/core/firebase/firebase_auth_service.dart';
 import 'package:pulse_flutter/core/firebase/social_auth_clients.dart';
 import 'package:pulse_flutter/core/firestore/pulse_account_repository.dart';
@@ -28,6 +29,7 @@ import 'package:pulse_flutter/core/notifications/pulse_push_message.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
 import 'package:pulse_flutter/core/providers/account_providers.dart';
 import 'package:pulse_flutter/core/providers/messaging_providers.dart';
+import 'package:pulse_flutter/core/providers/connectivity_providers.dart';
 import 'package:pulse_flutter/core/providers/share_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -210,6 +212,36 @@ void main() {
     },
   );
 
+  testWidgets('login screen shows an offline guidance card', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => null),
+          isAuthenticatedProvider.overrideWith((ref) => false),
+          pulseConnectivityServiceProvider.overrideWithValue(
+            const NoopPulseConnectivityService(
+              state: PulseConnectivityState.offline(),
+            ),
+          ),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Start onboarding'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue to login'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('You\'re offline.'), findsOneWidget);
+    expect(find.textContaining('sign-in and account creation'), findsOneWidget);
+  });
+
   testWidgets('signed-in users are routed to home', (
     WidgetTester tester,
   ) async {
@@ -301,6 +333,64 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Longest streak saved: 8 days.'), findsOneWidget);
+  });
+
+  testWidgets('home shows pending-sync context for a queued today session', (
+    WidgetTester tester,
+  ) async {
+    final SwipeSessionRecord pendingSession = _buildSessionRecord(
+      date: '2026-04-07',
+      acceptedEmotions: const ['Calm', 'Hope'],
+      contextSocial: 'Solo',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentUserProvider.overrideWith((ref) => null),
+          currentUserIdProvider.overrideWith((ref) => 'test-user'),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          currentUserProfileProvider.overrideWith(
+            (ref) => Stream.value(
+              _buildProfile(
+                displayName: 'Maya',
+                email: 'maya@example.com',
+                avatarColour: '#10B981',
+              ),
+            ),
+          ),
+          currentUserStreakProvider.overrideWith(
+            (ref) => const PulseStreak(
+              currentStreak: 2,
+              longestStreak: 4,
+              lastSessionDate: '2026-04-07',
+            ),
+          ),
+          currentUserLevelProgressProvider.overrideWith(
+            (ref) => const PulseLevelProgress(totalXp: 90, currentLevel: 1),
+          ),
+          todaySwipeSessionProvider.overrideWith(
+            (ref) => Stream.value(pendingSession),
+          ),
+          pendingTodaySwipeSessionProvider.overrideWith(
+            (ref) => Stream.value(pendingSession),
+          ),
+        ],
+        child: const PulseApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Done for today'), findsOneWidget);
+    expect(
+      find.textContaining('saved on this device and will sync'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('remote history will finish updating'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('home shows milestone proximity when a streak is close', (

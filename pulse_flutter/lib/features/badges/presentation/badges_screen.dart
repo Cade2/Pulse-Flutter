@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pulse_flutter/components/pulse_state_views.dart';
 import 'package:pulse_flutter/core/models/pulse_badge.dart';
 import 'package:pulse_flutter/core/providers/badge_providers.dart';
+import 'package:pulse_flutter/core/providers/connectivity_providers.dart';
 
 class BadgesScreen extends ConsumerWidget {
   const BadgesScreen({super.key});
@@ -11,6 +13,7 @@ class BadgesScreen extends ConsumerWidget {
     final AsyncValue<List<PulseBadgeStatus>> badgesAsync = ref.watch(
       currentUserBadgeStatusesProvider,
     );
+    final bool isOffline = ref.watch(isOfflineProvider);
     final TextTheme textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -69,34 +72,62 @@ class BadgesScreen extends ConsumerWidget {
               ),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const _BadgesLoadingState(),
           error: (error, stackTrace) {
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Unable to load badges',
-                        style: textTheme.headlineLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Please try again in a moment.',
-                        style: textTheme.bodyLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            return PulseStatusView(
+              title: 'Unable to load badges',
+              message: isOffline
+                  ? 'You\'re offline, so Pulse can\'t refresh your latest badge progress right now.'
+                  : 'Please try again in a moment.',
+              footnote: isOffline
+                  ? 'Unlocked badges already on this device will still appear again after the next successful sync.'
+                  : null,
+              icon: isOffline
+                  ? Icons.cloud_off_rounded
+                  : Icons.workspace_premium_outlined,
+              actionLabel: 'Try again',
+              onAction: () => ref.invalidate(currentUserBadgeStatusesProvider),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _BadgesLoadingState extends StatelessWidget {
+  const _BadgesLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: const [
+              PulseLoadingCard(
+                titleWidthFactor: 0.3,
+                lineWidthFactors: <double>[0.42, 0.86],
+                height: 118,
+              ),
+              SizedBox(height: 24),
+              PulseLoadingCard(
+                titleWidthFactor: 0.36,
+                lineWidthFactors: <double>[0.94, 0.84, 0.7],
+                height: 156,
+              ),
+              SizedBox(height: 12),
+              PulseLoadingCard(
+                titleWidthFactor: 0.34,
+                lineWidthFactors: <double>[0.92, 0.82, 0.68],
+                height: 156,
+              ),
+            ],
+          ),
         ),
       ),
     );

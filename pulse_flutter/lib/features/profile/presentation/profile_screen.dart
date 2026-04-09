@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
+import 'package:pulse_flutter/components/pulse_state_views.dart';
 import 'package:pulse_flutter/core/models/pulse_data_export.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_profile_settings.dart';
@@ -12,6 +13,7 @@ import 'package:pulse_flutter/core/models/pulse_streak.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/account_providers.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/connectivity_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
@@ -353,6 +355,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final AsyncValue<PulseUserProfile?> profileAsync = ref.watch(
       currentUserProfileProvider,
     );
+    final bool isOffline = ref.watch(isOfflineProvider);
     final PulseStreak streak = ref.watch(currentUserStreakProvider);
     final PulseLevelProgress levelProgress = ref.watch(
       currentUserLevelProgressProvider,
@@ -902,32 +905,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const _ProfileLoadingState(),
           error: (error, stackTrace) {
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Unable to load profile',
-                        style: textTheme.headlineLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Please try again in a moment.',
-                        style: textTheme.bodyLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            return PulseStatusView(
+              title: 'Unable to load profile',
+              message: isOffline
+                  ? 'You\'re offline, so Pulse can\'t refresh your latest profile settings right now.'
+                  : 'Please try again in a moment.',
+              footnote: isOffline
+                  ? 'Your saved settings and exports will be available again once the connection returns.'
+                  : null,
+              icon: isOffline ? Icons.cloud_off_rounded : Icons.person_outline,
+              actionLabel: 'Try again',
+              onAction: () => ref.invalidate(currentUserProfileProvider),
             );
           },
         ),
@@ -954,6 +944,70 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
 
     return parts.join(' | ');
+  }
+}
+
+class _ProfileLoadingState extends StatelessWidget {
+  const _ProfileLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Center(
+                child: SizedBox(
+                  width: 220,
+                  child: PulseSkeletonBox(height: 28),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Center(
+                child: SizedBox(
+                  width: 280,
+                  child: PulseSkeletonBox(height: 14),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const PulseLoadingCard(
+                titleWidthFactor: 0.34,
+                lineWidthFactors: <double>[0.92, 0.64],
+                height: 156,
+              ),
+              const SizedBox(height: 24),
+              const PulseLoadingCard(
+                titleWidthFactor: 0.28,
+                lineWidthFactors: <double>[0.86, 0.94, 0.72],
+                height: 198,
+              ),
+              const SizedBox(height: 24),
+              const PulseLoadingCard(
+                titleWidthFactor: 0.38,
+                lineWidthFactors: <double>[0.88, 0.76, 0.58],
+                height: 188,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

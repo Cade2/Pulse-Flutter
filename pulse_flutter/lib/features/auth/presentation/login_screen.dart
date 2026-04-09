@@ -8,6 +8,7 @@ import 'package:pulse_flutter/core/firebase/social_auth_clients.dart';
 import 'package:pulse_flutter/core/firestore/user_profile_repository.dart';
 import 'package:pulse_flutter/core/models/pulse_referral.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/connectivity_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
 
 enum _AuthAction { signIn, createAccount, googleSignIn, appleSignIn }
@@ -269,6 +270,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isOffline = ref.watch(isOfflineProvider);
     final TextTheme textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -341,6 +343,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             'Only used when creating a new Pulse account.',
                       ),
                     ),
+                    if (isOffline) ...[
+                      const SizedBox(height: 16),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.cloud_off_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'You\'re offline. Pulse sign-in and account creation still need a connection, but your local data will stay on this device once you\'re back online.',
+                                  style: textTheme.bodyMedium,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 16),
                       DecoratedBox(

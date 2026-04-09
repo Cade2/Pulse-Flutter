@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_flutter/app/router.dart';
 import 'package:pulse_flutter/components/pulse_avatar.dart';
+import 'package:pulse_flutter/components/pulse_state_views.dart';
 import 'package:pulse_flutter/core/models/pulse_level_progress.dart';
 import 'package:pulse_flutter/core/models/pulse_streak_engagement.dart';
 import 'package:pulse_flutter/core/models/user_profile.dart';
 import 'package:pulse_flutter/core/providers/auth_providers.dart';
+import 'package:pulse_flutter/core/providers/connectivity_providers.dart';
 import 'package:pulse_flutter/core/providers/streak_engagement_providers.dart';
 import 'package:pulse_flutter/core/providers/swipe_session_providers.dart';
 import 'package:pulse_flutter/core/providers/user_profile_providers.dart';
@@ -71,6 +73,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final AsyncValue<PulseUserProfile?> profileAsync = ref.watch(
       currentUserProfileProvider,
     );
+    final bool isOffline = ref.watch(isOfflineProvider);
     final PulseUserProfile? profile = profileAsync.asData?.value;
     final PulseLevelProgress levelProgress = ref.watch(
       currentUserLevelProgressProvider,
@@ -84,7 +87,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final AsyncValue<SwipeSessionRecord?> todaySessionAsync = ref.watch(
       todaySwipeSessionProvider,
     );
+    final AsyncValue<SwipeSessionRecord?> pendingTodaySessionAsync = ref.watch(
+      pendingTodaySwipeSessionProvider,
+    );
     final SwipeSessionRecord? todaySession = todaySessionAsync.asData?.value;
+    final bool hasPendingTodaySync =
+        isAuthenticated && pendingTodaySessionAsync.asData?.value != null;
     final String? email = currentUser?.email?.trim().isNotEmpty == true
         ? currentUser!.email!.trim()
         : profile?.email.trim();
@@ -114,6 +122,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             'P');
     final String avatarColour =
         profile?.avatarColour ?? PulseUserProfile.defaultAvatarColour;
+    final bool isProfileLoading =
+        isAuthenticated && profileAsync.isLoading && !profileAsync.hasValue;
 
     final String authMessage;
     if (!isAuthenticated) {
@@ -136,16 +146,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _HomeHeader(
-                    greetingName: greetingName,
-                    subtitle: authMessage,
-                    avatarInitial: avatarInitial,
-                    avatarColour: avatarColour,
-                    onProfilePressed: isAuthenticated
-                        ? () => context.goNamed(AppRoutes.profileName)
-                        : null,
-                  ),
+                  if (isProfileLoading)
+                    const _HomeHeaderSkeleton()
+                  else
+                    _HomeHeader(
+                      greetingName: greetingName,
+                      subtitle: authMessage,
+                      avatarInitial: avatarInitial,
+                      avatarColour: avatarColour,
+                      onProfilePressed: isAuthenticated
+                          ? () => context.goNamed(AppRoutes.profileName)
+                          : null,
+                    ),
                   if (isAuthenticated) ...[
+                    if (profileAsync.hasError && !profileAsync.hasValue) ...[
+                      const SizedBox(height: 16),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'Using limited profile details',
+                                style: textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                isOffline
+                                    ? 'You\'re offline, so Pulse is showing the last auth details it can. Your profile will refresh when you reconnect.'
+                                    : 'Pulse could not refresh your profile details just now. You can keep using the app and try again in a moment.',
+                                style: textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: FilledButton.tonal(
+                                  onPressed: () => ref.invalidate(
+                                    currentUserProfileProvider,
+                                  ),
+                                  child: const Text('Refresh profile'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     _LevelProgressCard(levelProgress: levelProgress),
                     const SizedBox(height: 16),
@@ -157,6 +210,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const SizedBox(height: 16),
                     _TodaySessionStatusCard(
                       todaySessionAsync: todaySessionAsync,
+                      hasPendingSync: hasPendingTodaySync,
+                      isOffline: isOffline,
+                      onRetry: () => ref.invalidate(todaySwipeSessionProvider),
                     ),
                   ],
                   if (_errorMessage != null) ...[
@@ -284,6 +340,49 @@ class _HomeHeader extends StatelessWidget {
   }
 }
 
+class _HomeHeaderSkeleton extends StatelessWidget {
+  const _HomeHeaderSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PulseSkeletonBox(height: 16, widthFactor: 0.2),
+                  SizedBox(height: 10),
+                  PulseSkeletonBox(height: 28, widthFactor: 0.64),
+                  SizedBox(height: 10),
+                  PulseSkeletonBox(height: 14, widthFactor: 0.74),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LevelProgressCard extends StatelessWidget {
   const _LevelProgressCard({required this.levelProgress});
 
@@ -374,9 +473,17 @@ class _StreakSummaryCard extends StatelessWidget {
 }
 
 class _TodaySessionStatusCard extends StatelessWidget {
-  const _TodaySessionStatusCard({required this.todaySessionAsync});
+  const _TodaySessionStatusCard({
+    required this.todaySessionAsync,
+    required this.hasPendingSync,
+    required this.isOffline,
+    required this.onRetry,
+  });
 
   final AsyncValue<SwipeSessionRecord?> todaySessionAsync;
+  final bool hasPendingSync;
+  final bool isOffline;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -412,9 +519,18 @@ class _TodaySessionStatusCard extends StatelessWidget {
                 Text('Done for today', style: textTheme.titleLarge),
                 const SizedBox(height: 8),
                 Text(
-                  'Today\'s Pulse session is complete. Come back tomorrow for your next check-in.',
+                  hasPendingSync
+                      ? 'Today\'s Pulse session is saved on this device and will sync as soon as you reconnect.'
+                      : 'Today\'s Pulse session is complete. Come back tomorrow for your next check-in.',
                   style: textTheme.bodyMedium,
                 ),
+                if (hasPendingSync) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your streak and remote history will finish updating after sync completes.',
+                    style: textTheme.bodySmall,
+                  ),
+                ],
                 if (session.acceptedEmotions.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text('Accepted emotions', style: textTheme.titleMedium),
@@ -457,8 +573,15 @@ class _TodaySessionStatusCard extends StatelessWidget {
                 Text('Unable to check today', style: textTheme.titleLarge),
                 const SizedBox(height: 8),
                 Text(
-                  'Please try again in a moment before starting a new session.',
+                  isOffline
+                      ? 'You\'re offline, so Pulse can\'t confirm your latest remote session state right now.'
+                      : 'Please try again in a moment before starting a new session.',
                   style: textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.tonal(
+                  onPressed: onRetry,
+                  child: const Text('Try again'),
                 ),
               ],
             );
